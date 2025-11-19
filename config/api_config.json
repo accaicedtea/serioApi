@@ -1,0 +1,94 @@
+{
+    "my_menu": {
+        "allergens": {
+            "enabled": true,
+            "rate_limit": 100,
+            "rate_limit_window": 60,
+            "max_results": 100,
+            "require_auth": false,
+            "enable_cache": false,
+            "cache_ttl": 300,
+            "select": "all",
+            "insert": "auth",
+            "update": "auth",
+            "delete": "admin"
+        },
+        "banned_ips": {
+            "enabled": false
+        },
+        "custom_queries": {
+            "enabled": false
+        },
+        "failed_attempts": {
+            "enabled": false
+        },
+        "generated_apis": {
+            "enabled": false
+        },
+        "menu_categories": {
+            "enabled": false
+        },
+        "menu_item_allergens": {
+            "enabled": false
+        },
+        "menu_items": {
+            "enabled": false
+        },
+        "menu_sub_items": {
+            "enabled": false
+        },
+        "nav_links": {
+            "enabled": false
+        },
+        "rate_limits": {
+            "enabled": false
+        },
+        "security_logs": {
+            "enabled": false
+        },
+        "user_auth": {
+            "enabled": false
+        },
+        "users": {
+            "enabled": false
+        },
+        "_views": {
+            "testoo": {
+                "name": "testoo",
+                "description": "",
+                "query": "select *\nfrom allergens",
+                "rate_limit": 100,
+                "rate_limit_window": 60,
+                "max_results": 100,
+                "require_auth": false,
+                "enable_cache": false,
+                "cache_ttl": 300
+            }
+        },
+        "_view_testoo": {
+            "enabled": true,
+            "is_virtual": true,
+            "view_name": "testoo"
+        }
+    },
+    "database2": {
+        "test_table": {
+            "enabled": true,
+            "rate_limit": 50,
+            "rate_limit_window": 60,
+            "max_results": 50,
+            "require_auth": true,
+            "enable_cache": true,
+            "cache_ttl": 600,
+            "select": "auth",
+            "insert": "admin",
+            "update": "admin",
+            "delete": "admin"
+        }
+    },
+    "database3": {
+        "sample_table": {
+            "enabled": false
+        }
+    }
+}

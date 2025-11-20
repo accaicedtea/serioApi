@@ -79,7 +79,7 @@ class HomeController extends Controller {
             error_log("CONNESSIONE FALLITA: " . $e->getMessage());
         }
         
-        $title = $isConnected ? 'Home - Connected' : 'Home - Disconnected';
+        $title = $isConnected ? 'Home - Connesso' : 'Home - Disconnesso';
         
         // DATI PER LA PAGINA
         $data = [

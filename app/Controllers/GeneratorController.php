@@ -6,9 +6,17 @@ use Core\Security;
 use Core\Database;
 
 class GeneratorController extends Controller {
-    private $configFile = __DIR__ . '/../../config/api_config.json';
-    
     public function index() {
+
+        $data = [
+            'title' => 'API Generator - Configurazione',
+            'tables' => [],
+            'config' => [],
+            'currentDatabase' => '',
+            'securityTables' => [],
+            'error' => null
+        ];
+        
         try {
             $db = db();
             $tables = $db->query("SHOW TABLES")->fetchAll(\PDO::FETCH_COLUMN);
@@ -23,7 +31,7 @@ class GeneratorController extends Controller {
             ];
 
             // Carica la configurazione esistente
-            $config = $this->loadConfig();
+            $config = loadApiConfig();
             
             // Ottieni il nome del database corrente
             $databaseName = getDatabaseName();
@@ -36,25 +44,19 @@ class GeneratorController extends Controller {
                     }
                 }
             }
+            // Dati se funziona
+            $data['tables'] = $tables;
+            $data['config'] = $config;
+            $data['currentDatabase'] = $databaseName;
+            $data['securityTables'] = $securityTables;
             
-            //dati se funziona
-            $data = [
-                'title' => 'API Generator - Configurazione',
-                'tables' => $tables,
-                'config' => $config,
-                'currentDatabase' => $databaseName,
-                'securityTables' => $securityTables
-            ];
-            
-            $this->view('generator/index', $data);
         } catch (\PDOException $e) {
-
-            $data = [
-                'title' => 'Database Error',
-                'error' => $e->getMessage()
-            ];
-            $this->view('generator/index', $data);
+            // Dati se errore
+            $data['title'] = 'Database ERROREE';
+            $data['error'] = $e->getMessage();
         }
+        
+        $this->view('generator/index', $data);
     }
     
     public function createSecurityTables() {
@@ -63,7 +65,7 @@ class GeneratorController extends Controller {
             exit;
         }
         
-        if (!Security::checkCsrf($_POST['csrf_token'] ?? '')) {
+        if (!e($_POST['csrf_token'])) {
             die('Token CSRF non valido');
         }
         
@@ -165,6 +167,15 @@ class GeneratorController extends Controller {
     }
     
     public function views() {
+        $data = [
+            'title' => 'API Generator - Viste Personalizzate',
+            'viewsConfig' => [],
+            'viewsEnabled' => [],
+            'currentDatabase' => '',
+            'tables' => [],
+            'error' => null
+        ];
+        
         try {
             $db = db();
             
@@ -172,7 +183,7 @@ class GeneratorController extends Controller {
             $tables = $db->query("SHOW TABLES")->fetchAll(\PDO::FETCH_COLUMN);
             
             // Carica la configurazione esistente delle viste
-            $config = $this->loadConfig();
+            $config = loadApiConfig();
             
             // Ottieni il nome del database corrente
             $databaseName = getDatabaseName();
@@ -189,22 +200,18 @@ class GeneratorController extends Controller {
                 $viewsEnabled[$viewName] = $config[$databaseName]['_view_' . $viewName]['enabled'] ?? false;
             }
             
-            $data = [
-                'title' => 'API Generator - Viste Personalizzate',
-                'viewsConfig' => $viewsConfig,
-                'viewsEnabled' => $viewsEnabled,
-                'currentDatabase' => $databaseName,
-                'tables' => $tables
-            ];
+            // Dati se funziona
+            $data['viewsConfig']=$viewsConfig;
+            $data['viewsEnabled'] = $viewsEnabled;
+            $data['currentDatabase'] = $databaseName;
+            $data['tables'] = $tables;
             
-            $this->view('generator/views', $data);
         } catch (\PDOException $e) {
-            $data = [
-                'title' => 'Database Error',
-                'error' => $e->getMessage()
-            ];
-            $this->view('generator/views', $data);
+            // Dati se errore
+            $data['title'] = 'Database Error';
+            $data['error'] = $e->getMessage();
         }
+        $this->view('generator/views', $data);
     }
     
     public function testView() {
@@ -254,7 +261,7 @@ class GeneratorController extends Controller {
         $viewData = json_decode($_POST['view_data'] ?? '{}', true);
         
         // Carica configurazione esistente
-        $config = $this->loadConfig();
+        $config = loadApiConfig();
         
         // Ottieni il nome del database corrente
         $dbConfig = require __DIR__ . '/../../config/database.php';
@@ -281,7 +288,7 @@ class GeneratorController extends Controller {
             'view_name' => $viewName
         ];
         
-        file_put_contents($this->configFile, json_encode($config, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+        saveApiConfig($config);
         
         header('Location: /generator/views?saved=1');
         exit;
@@ -310,11 +317,10 @@ class GeneratorController extends Controller {
             exit;
         }
         
-        $config = $this->loadConfig();
+        $config = loadApiConfig();
         
         // Ottieni il nome del database corrente
-        $dbConfig = require __DIR__ . '/../../config/database.php';
-        $databaseName = $dbConfig['dbname'] ?? 'unknown';
+        $databaseName = getDatabaseName();
         
         // Verifica che la vista esista
         if (!isset($config[$databaseName]['_views'][$viewName])) {
@@ -338,7 +344,7 @@ class GeneratorController extends Controller {
         $config[$databaseName]['_view_' . $viewName]['enabled'] = $newState;
         
         // Salva la configurazione
-        file_put_contents($this->configFile, json_encode($config, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+        saveApiConfig($config);
         
         echo json_encode([
             'success' => true,
@@ -360,11 +366,10 @@ class GeneratorController extends Controller {
         
         $viewName = $_POST['view_name'] ?? '';
         
-        $config = $this->loadConfig();
+        $config = loadApiConfig();
         
         // Ottieni il nome del database corrente
-        $dbConfig = require __DIR__ . '/../../config/database.php';
-        $databaseName = $dbConfig['dbname'] ?? 'unknown';
+        $databaseName = getDatabaseName();
         
         // Rimuovi la vista dalla sezione _views del database corrente
         if (isset($config[$databaseName]['_views'][$viewName])) {
@@ -376,7 +381,7 @@ class GeneratorController extends Controller {
             unset($config[$databaseName]['_view_' . $viewName]);
         }
         
-        file_put_contents($this->configFile, json_encode($config, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+        saveApiConfig($config);
         
         header('Location: /generator/views?deleted=1');
         exit;
@@ -395,11 +400,10 @@ class GeneratorController extends Controller {
         $newConfig = json_decode($_POST['config'] ?? '{}', true);
         
         // Carica la configurazione esistente per preservare _views
-        $existingConfig = $this->loadConfig();
+        $existingConfig = loadApiConfig();
         
         // Ottieni il nome del database corrente
-        $dbConfig = require __DIR__ . '/../../config/database.php';
-        $databaseName = $dbConfig['dbname'] ?? 'unknown';
+        $databaseName = getDatabaseName();
         
         // Preserva _views del database corrente e ricostruisci le tabelle virtuali
         if (isset($existingConfig[$databaseName]['_views'])) {
@@ -418,16 +422,9 @@ class GeneratorController extends Controller {
             }
         }
         
-        file_put_contents($this->configFile, json_encode($newConfig, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+        saveApiConfig($newConfig);
         
         header('Location: /generator?saved=1');
         exit;
-    }
-    
-    private function loadConfig() {
-        if (file_exists($this->configFile)) {
-            return json_decode(file_get_contents($this->configFile), true) ?? [];
-        }
-        return [];
     }
 }

@@ -1,5 +1,5 @@
 <?php
-// Front controller
+// Core Controllers
 require_once './core/helpers.php';
 require_once './core/App.php';
 require_once './core/Controller.php';

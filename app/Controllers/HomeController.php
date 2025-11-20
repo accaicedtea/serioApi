@@ -76,11 +76,14 @@ class HomeController extends Controller {
             $isConnected = false;
             $errorMessage = $e->getMessage();
             // Messaggio di errore se non è connesso ad un database
-            error_log("Database connection failed: " . $e->getMessage());
+            error_log("CONNESSIONE FALLITA: " . $e->getMessage());
         }
+        
+        $title = $isConnected ? 'Home - Connected' : 'Home - Disconnected';
+        
         // DATI PER LA PAGINA
         $data = [
-            'title' => 'Welcome',
+            'title' => $title,
             'databaseType' => $connectionType,
             'connectionStatus' => $isConnected ? 'Connected' : 'Disconnected',
             'errorMessage' => $errorMessage,

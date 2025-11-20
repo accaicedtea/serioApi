@@ -4,6 +4,56 @@
 use Core\Database;
 
 /**
+ * Carica variabili d'ambiente dal file .env
+ */
+function loadEnv(?string $path = null): void {
+    static $loaded = false;
+    
+    if ($loaded) {
+        return;
+    }
+    
+    $envFile = $path ?? __DIR__ . '/../config/.env';
+    
+    if (!file_exists($envFile)) {
+        return;
+    }
+    
+    $lines = file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    foreach ($lines as $line) {
+        // Skip comments
+        if (strpos(trim($line), '#') === 0) {
+            continue;
+        }
+        
+        // Parse key=value
+        $parts = explode('=', $line, 2);
+        if (count($parts) === 2) {
+            $key = trim($parts[0]);
+            $value = trim($parts[1]);
+            
+            // Remove inline comments
+            if (strpos($value, '#') !== false) {
+                $value = trim(explode('#', $value)[0]);
+            }
+            
+            $_ENV[$key] = $value;
+            putenv("$key=$value");
+        }
+    }
+    
+    $loaded = true;
+}
+
+/**
+ * Ottiene una variabile d'ambiente
+ */
+function env(string $key, $default = null) {
+    loadEnv();
+    return $_ENV[$key] ?? getenv($key) ?: $default;
+}
+
+/**
  * Escape output per prevenire XSS
  */
 function e($value) {

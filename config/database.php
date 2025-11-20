@@ -1,7 +1,13 @@
 <?php
 
+// Load helper functions (includes loadEnv)
+require_once __DIR__ . '/../core/helpers.php';
+
+// Load environment variables
+loadEnv();
+
 // Configuration for different environments
-$environment = $_ENV['APP_ENV'] ?? 'development';
+$environment = env('ENVIRONMENT', 'development');
 
 $databases = [
     'development' => [
@@ -15,9 +21,9 @@ $databases = [
     'production' => [
         'dbType' => 'MySQL',
         'host' => 'localhost',
-        'dbname' => 'my_menu_prod',
-        'user' => 'root',
-        'pass' => '',
+        'dbname' =>  'my_accaicedtea',
+        'user' =>  'root',
+        'pass' =>  '',
         'charset' => 'utf8mb4',
     ],
 ];

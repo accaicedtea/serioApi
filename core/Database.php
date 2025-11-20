@@ -9,12 +9,13 @@ class Database {
             $config = require __DIR__ . '/../config/database.php';
             
             if ($config === null) {
-                throw new \Exception('Database configuration file not found.');
+                throw new \Exception('File di configurazione non trovato.');
             }
             if (!isset($config['host'], $config['dbname'], $config['user'], $config['pass'], $config['charset'])) {
-                throw new \Exception('Database configuration is incomplete.');
+                throw new \Exception('Mancano delle configurazioni nel file di configurazione.');
             }
             if ($config['host'] == 'localhost') {
+                // non so localhost mi da problemi
                 $config['host'] = '127.0.0.1';
             }
 
@@ -33,7 +34,7 @@ class Database {
                 if (php_sapi_name() === 'cli') {
                     echo "[CORE: DB] Errore connessione: " . $e->getMessage() . "\n";
                 }
-                throw new \Exception('Database connection failed: ' . $e->getMessage());
+                throw new \Exception('Connessione col DATABASE fallita: ' . $e->getMessage());
             }
         }
     }

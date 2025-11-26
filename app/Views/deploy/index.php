@@ -50,14 +50,15 @@
 
             <div class="form-group">
                 <label>Username *</label>
-                <input type="text" name="ftp_user" id="ftp_user" value="<?= e($savedCredentials['ftp_user'] ?? '') ?>"
+                <input type="text" name="ftp_user" id="ftp_user" value="<?= e($savedCredentials['ftp_user']) ?>"
                     required>
             </div>
 
             <div class="form-group">
                 <label>Password *</label>
-                <input type="password" name="ftp_pass" id="ftp_pass" required>
-                <small style="color: #856404;"> Per sicurezza, la password non viene salvata. Reinseriscila ad ogni
+        <!--TODO: poi togli il fatto che è automatico -->
+                <input type="password" name="ftp_pass" id="ftp_pass" value="<?= e($savedCredentials['ftp_pass']) ?>"required>
+                <small style="color: #856404;"> (MO LO FA IN AUTOMATICO) Per sicurezza, la password non viene salvata. Reinseriscila ad ogni
                     deploy.</small>
             </div>
 

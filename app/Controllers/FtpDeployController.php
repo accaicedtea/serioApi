@@ -3,10 +3,9 @@ namespace App\Controllers;
 
 use Core\Controller;
 use Core\Security;
-
+// TODO: non funziona
 class FtpDeployController extends Controller {
     private $generatedApiPath = __DIR__ . '/../../generated-api';
-    private $credentialsFile = __DIR__ . '/../../config/ftp_credentials.json';
     
     public function index() {
         // Verifica se la cartella generated-api esiste
@@ -26,37 +25,17 @@ class FtpDeployController extends Controller {
     }
     
     private function loadCredentials() {
-        if (file_exists($this->credentialsFile)) {
-            $json = file_get_contents($this->credentialsFile);
-            return json_decode($json, true);
-        }
         return [
-            'ftp_host' => '',
-            'ftp_port' => 21,
-            'ftp_user' => '',
-            'ftp_path' => '/public_html/api',
-            'ftp_ssl' => false
+            'ftp_host' => env('FTP_HOST'),
+            'ftp_port' => env('FTP_PORT'),
+            'ftp_user' => env('FTP_USERNAME'),
+            'ftp_pass' => env('FTP_PASSWORD'),
+            'ftp_path' => env('FTP_REMOTE_PATH'),
+            'ftp_ssl' => env('FTP_SSL'),
         ];
     }
     
-    private function saveCredentials($data) {
-        // Non salvare la password in chiaro
-        $credentials = [
-            'ftp_host' => $data['ftp_host'] ?? '',
-            'ftp_port' => $data['ftp_port'] ?? 21,
-            'ftp_user' => $data['ftp_user'] ?? '',
-            'ftp_path' => $data['ftp_path'] ?? '/public_html/api',
-            'ftp_ssl' => isset($data['ftp_ssl'])
-        ];
-        
-        // Crea la cartella config se non esiste
-        $configDir = dirname($this->credentialsFile);
-        if (!file_exists($configDir)) {
-            mkdir($configDir, 0755, true);
-        }
-        
-        file_put_contents($this->credentialsFile, json_encode($credentials, JSON_PRETTY_PRINT));
-    }
+
     
     public function upload() {
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -79,11 +58,10 @@ class FtpDeployController extends Controller {
             header('Location: /deploy?error=' . urlencode('Compila tutti i campi obbligatori'));
             exit;
         }
-        
-        // Salva le credenziali (esclusa la password)
-        $this->saveCredentials($_POST);
-        
         try {
+            // Sopprime i warning SSL durante la connessione
+            error_reporting(E_ERROR | E_PARSE);
+            
             // Connessione FTP
             $useSsl ? $conn = @ftp_ssl_connect($host, $port, 30) : $conn = @ftp_connect($host, $port, 30);
 
@@ -98,13 +76,16 @@ class FtpDeployController extends Controller {
             // Modalità passiva (risolve problemi con alcuni firewall)
             ftp_pasv($conn, true);
             
+            // Ripristina error reporting
+            error_reporting(E_ALL);
+            
             // Crea la cartella remota se non esiste
             $this->createRemoteDir($conn, $remotePath);
             
             // Upload ricorsivo
             $uploadedFiles = $this->uploadDirectory($conn, $this->generatedApiPath, $remotePath);
             
-            ftp_close($conn);
+            @ftp_close($conn);
             
             header('Location: /deploy?success=1&files=' . $uploadedFiles);
             exit;
@@ -133,6 +114,9 @@ class FtpDeployController extends Controller {
         $useSsl = isset($_POST['ftp_ssl']);
         
         try {
+            // Sopprime i warning SSL durante la connessione
+            error_reporting(E_ERROR | E_PARSE);
+            
             $useSsl ? $conn = @ftp_ssl_connect($host, $port, 10) : $conn = @ftp_connect($host, $port, 10);
 
 
@@ -142,7 +126,10 @@ class FtpDeployController extends Controller {
             
             
             $pwd = ftp_pwd($conn);
-            ftp_close($conn);
+            @ftp_close($conn);
+            
+            // Ripristina error reporting
+            error_reporting(E_ALL);
             
             echo json_encode([
                 'success' => true,

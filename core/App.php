@@ -22,11 +22,11 @@ class App {
                 call_user_func_array([$controller, $this->method], $this->params);
             } else {
                 http_response_code(404);
-                echo 'Method not found';
+                echo 'Metodo non trovato';
             }
         } else {
             http_response_code(404);
-            echo 'Controller not found';
+            echo 'Controller non trovato';
         }
     }
 }

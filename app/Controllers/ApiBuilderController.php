@@ -4,15 +4,17 @@ namespace App\Controllers;
 use Core\Controller;
 use Core\Security;
 
-class ApiBuilderController extends Controller {
+class ApiBuilderController extends Controller
+{
     private $configFile = __DIR__ . '/../../config/api_config.json';
     private $outputPath = __DIR__ . '/../../generated-api';
-    
-    public function index() {
+
+    public function index()
+    {
         $config = $this->loadConfig();
         $currentDbConfig = $config[getDatabaseName()] ?? [];
         $enabledTables = $this->getEnabledTables($currentDbConfig);
-        
+
         $data = [
             'title' => 'API Builder - Generatore',
             'config' => $currentDbConfig,
@@ -20,49 +22,50 @@ class ApiBuilderController extends Controller {
             'enabledCount' => count($enabledTables),
             'outputPath' => $this->outputPath,
         ];
-        
+
         $this->view('/generator/builder', $data);
     }
-    
-    public function generate() {
+
+    public function generate()
+    {
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
             header('Location: /generator/builder');
             exit;
         }
-        
+
         if (!e($_POST['csrf_token'])) {
             die('Token CSRF non valido');
         }
-        
+
         try {
             $config = $this->loadConfig();
             $currentDbConfig = $config[getDatabaseName()] ?? [];
-            
+
             if (empty($currentDbConfig)) {
                 throw new \Exception("Configurazione non trovata per il database: " . getDatabaseName());
             }
-            
+
             // 1. Crea struttura cartelle
             $this->createDirectoryStructure();
-            
+
             // 2. Genera file di configurazione
             $this->generateConfigFiles();
-            
+
             // 3. Genera middleware
             $this->generateMiddleware();
-            
+
             // 4. Genera modelli ed endpoint per ogni tabella abilitata
             $this->generateTablesApi($currentDbConfig);
-            
+
             // 5. Genera auth endpoint e modello User
             $this->generateAuthApi();
-            
+
             // 6. Genera .htaccess
             $this->generateHtaccess();
-            
+
             // 7. Genera documentazione
             $this->generateDocumentation($config);
-            
+
             header('Location: /generator/builder?success=1');
             exit;
         } catch (\Exception $e) {
@@ -70,10 +73,11 @@ class ApiBuilderController extends Controller {
             exit;
         }
     }
-    
+
     // ===== STRUTTURA CARTELLE =====
-    
-    private function createDirectoryStructure() {
+
+    private function createDirectoryStructure()
+    {
         $dirs = [
             $this->outputPath,
             $this->outputPath . '/config',
@@ -82,43 +86,56 @@ class ApiBuilderController extends Controller {
             $this->outputPath . '/endpoints',
             $this->outputPath . '/auth'
         ];
-        
+
         foreach ($dirs as $dir) {
             if (!is_dir($dir)) {
                 mkdir($dir, 0755, true);
             }
         }
     }
-    
+
     // ===== CONFIGURAZIONE =====
-    
-    private function generateConfigFiles() {
+
+    private function generateConfigFiles()
+    {
         // 1. database.php - usa i dati dall'ENV
         $this->generateDatabaseConfig();
-        
+
         // 2. jwt.php - usa JWT_SECRET dall'ENV
         $this->generateJwtConfig();
-        
+
         // 3. helpers.php - funzioni globali unificate
         $this->generateHelpersFile();
-        
-        // 4. api_config.json
+
+        // 4. cors.php - CORS headers standalone
+        $this->generateCorsFile();
+
+        // 5. api_config.json
         copy($this->configFile, $this->outputPath . '/config/api_config.json');
-        
-        // 5. .htaccess per proteggere config
+
+        // 6. .htaccess per proteggere config
         file_put_contents($this->outputPath . '/config/.htaccess', "Deny from all\n");
     }
-    
-    private function generateDatabaseConfig() {
+
+    private function generateDatabaseConfig()
+    {
         $dbConfig = require __DIR__ . '/../../config/database.php';
         
+        // Usa sempre production per le API generate
+        $envConfig = $dbConfig;
+        if (isset($dbConfig['production'])) {
+            $envConfig = $dbConfig['production'];
+        } elseif (isset($dbConfig['development'])) {
+            $envConfig = $dbConfig['development'];
+        }
+
         $content = <<<PHP
 <?php
 // Database configuration
 define('DB_HOST', '127.0.0.1');
-define('DB_NAME', '{$dbConfig['dbname']}');
-define('DB_USER', '{$dbConfig['user']}');
-define('DB_PASS', '{$dbConfig['pass']}');
+define('DB_NAME', '{$envConfig['dbname']}');
+define('DB_USER', '{$envConfig['user']}');
+define('DB_PASS', '{$envConfig['pass']}');
 
 class Database {
     private \$host = DB_HOST;
@@ -146,10 +163,11 @@ class Database {
 PHP;
         file_put_contents($this->outputPath . '/config/database.php', $content);
     }
-    
-    private function generateJwtConfig() {
+
+    private function generateJwtConfig()
+    {
         $jwtSecret = env('JWT_SECRET', 'd72937b1639933aed25cb50d65f63cb7');
-        
+
         $content = <<<PHP
 <?php
 
@@ -222,8 +240,9 @@ class JWTHandler {
 PHP;
         file_put_contents($this->outputPath . '/config/jwt.php', $content);
     }
-    
-    private function generateHelpersFile() {
+
+    private function generateHelpersFile()
+    {
         $content = <<<'PHP'
 <?php
 // ===== HELPER FUNCTIONS UNIFICATE =====
@@ -278,21 +297,47 @@ function e($value) {
 PHP;
         file_put_contents($this->outputPath . '/config/helpers.php', $content);
     }
-    
+
+    private function generateCorsFile()
+    {
+        $content = <<<'PHP'
+<?php
+// File CORS standalone per Altervista
+// Includi questo file all'inizio di ogni endpoint
+
+// CORS Headers - Più permissivi per debug
+header("Access-Control-Allow-Origin: *");
+header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
+header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With, Accept, Origin");
+header("Access-Control-Allow-Credentials: true");
+header("Access-Control-Max-Age: 86400");
+
+// Handle preflight OPTIONS
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    http_response_code(200);
+    exit(0);
+}
+
+PHP;
+        file_put_contents($this->outputPath . '/cors.php', $content);
+    }
+
     // ===== MIDDLEWARE =====
-    
-    private function generateMiddleware() {
+
+    private function generateMiddleware()
+    {
         // 1. auth.php
         $this->generateAuthMiddleware();
-        
+
         // 2. security.php (basico)
         $this->generateSecurityMiddleware();
-        
+
         // 3. security_helper.php
         $this->generateSecurityHelper();
     }
-    
-    private function generateAuthMiddleware() {
+
+    private function generateAuthMiddleware()
+    {
         $content = <<<'PHP'
 <?php
 require_once __DIR__ . '/../config/jwt.php';
@@ -327,8 +372,9 @@ function requireRole($required_role) {
 PHP;
         file_put_contents($this->outputPath . '/middleware/auth.php', $content);
     }
-    
-    private function generateSecurityMiddleware() {
+
+    private function generateSecurityMiddleware()
+    {
         $content = <<<'PHP'
 <?php
 class SecurityMiddleware {
@@ -396,8 +442,9 @@ class SecurityMiddleware {
 PHP;
         file_put_contents($this->outputPath . '/middleware/security.php', $content);
     }
-    
-    private function generateSecurityHelper() {
+
+    private function generateSecurityHelper()
+    {
         $content = <<<'PHP'
 <?php
 require_once __DIR__ . '/security.php';
@@ -417,16 +464,17 @@ function applySecurity($endpoint, $limit = 100, $window = 60) {
 PHP;
         file_put_contents($this->outputPath . '/middleware/security_helper.php', $content);
     }
-    
+
     // ===== GENERAZIONE TABELLE =====
-    
-    private function generateTablesApi($currentDbConfig) {
+
+    private function generateTablesApi($currentDbConfig)
+    {
         foreach ($currentDbConfig as $tableName => $tableConfig) {
             // Salta _views
             if ($tableName === '_views' || substr($tableName, 0, 6) === '_view_') {
                 continue;
             }
-            
+
             if (isset($tableConfig['enabled']) && $tableConfig['enabled'] === true) {
                 $columns = $this->getTableColumns($tableName);
                 $this->generateModel($tableName, $columns);
@@ -434,11 +482,12 @@ PHP;
             }
         }
     }
-    
-    private function generateModel($tableName, $columns) {
+
+    private function generateModel($tableName, $columns)
+    {
         $className = $this->toCamelCase($tableName);
         $primaryKey = $this->getPrimaryKey($columns);
-        
+
         // Genera campi per INSERT/UPDATE
         $fields = [];
         foreach ($columns as $column) {
@@ -446,7 +495,7 @@ PHP;
                 $fields[] = $column['Field'];
             }
         }
-        
+
         $bindParams = '';
         $setParams = '';
         foreach ($fields as $field) {
@@ -454,7 +503,7 @@ PHP;
             $setParams .= "{$field}=:{$field}, ";
         }
         $setParams = rtrim($setParams, ', ');
-        
+
         $content = <<<PHP
 <?php
 require_once __DIR__ . '/../config/database.php';
@@ -525,26 +574,29 @@ class {$className} {
 PHP;
         file_put_contents($this->outputPath . "/models/{$className}.php", $content);
     }
-    
-    private function generateEndpoint($tableName, $config, $columns) {
+
+    private function generateEndpoint($tableName, $config, $columns)
+    {
         $className = $this->toCamelCase($tableName);
         $primaryKey = $this->getPrimaryKey($columns);
-        
+
         // Controllo autenticazione
-        $requiresAuth = ($config['select'] !== 'all' || $config['insert'] !== 'all' || 
-                        $config['update'] !== 'all' || $config['delete'] !== 'all');
-        
+        $requiresAuth = ($config['select'] !== 'all' || $config['insert'] !== 'all' ||
+            $config['update'] !== 'all' || $config['delete'] !== 'all');
+
         $authRequire = $requiresAuth ? "require_once __DIR__ . '/../middleware/auth.php';" : "";
-        
+
         // Validazione campi obbligatori
         $requiredFields = [];
         foreach ($columns as $column) {
-            if ($column['Null'] === 'NO' && $column['Extra'] !== 'auto_increment' && 
-                $column['Field'] !== $primaryKey && !isset($column['Default'])) {
+            if (
+                $column['Null'] === 'NO' && $column['Extra'] !== 'auto_increment' &&
+                $column['Field'] !== $primaryKey && !isset($column['Default'])
+            ) {
                 $requiredFields[] = $column['Field'];
             }
         }
-        
+
         $requiredCheck = '';
         if (!empty($requiredFields)) {
             $checks = [];
@@ -553,19 +605,20 @@ PHP;
             }
             $requiredCheck = "if(" . implode(' || ', $checks) . ") {\n        sendResponse(400, null, 'Missing required fields');\n    }\n    ";
         }
-        
+
         // Controlli di autenticazione per ogni operazione
         $selectAuth = $config['select'] !== 'all' ? "\$user = requireAuth();" : "";
         $insertAuth = $config['insert'] !== 'all' ? "\$user = requireAuth();" : "";
         $updateAuth = $config['update'] !== 'all' ? "\$user = requireAuth();" : "";
         $deleteAuth = $config['delete'] !== 'all' ? "\$user = requireAuth();" : "";
-        
+
         // Rate limiting dalla configurazione
         $rateLimit = $config['rate_limit'] ?? 100;
         $rateLimitWindow = $config['rate_limit_window'] ?? 60;
-        
+
         $content = <<<PHP
 <?php
+require_once __DIR__ . '/../cors.php';
 require_once __DIR__ . '/../config/helpers.php';
 require_once __DIR__ . '/../config/database.php';
 {$authRequire}
@@ -648,21 +701,23 @@ switch(\$method) {
 PHP;
         file_put_contents($this->outputPath . "/endpoints/{$tableName}.php", $content);
     }
-    
+
     // ===== AUTENTICAZIONE =====
-    
-    private function generateAuthApi() {
+
+    private function generateAuthApi()
+    {
         // 1. Modello User
         $this->generateUserModel();
-        
+
         // 2. Endpoint auth/login
         $this->generateAuthEndpoint();
-        
+
         // 3. auth/me.php
         $this->generateAuthMe();
     }
-    
-    private function generateUserModel() {
+
+    private function generateUserModel()
+    {
         $content = <<<'PHP'
 <?php
 require_once __DIR__ . '/../config/database.php';
@@ -722,10 +777,12 @@ class User {
 PHP;
         file_put_contents($this->outputPath . '/models/User.php', $content);
     }
-    
-    private function generateAuthEndpoint() {
+
+    private function generateAuthEndpoint()
+    {
         $content = <<<'PHP'
 <?php
+require_once __DIR__ . '/../cors.php';
 require_once __DIR__ . '/../config/helpers.php';
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../config/jwt.php';
@@ -793,8 +850,9 @@ switch($method) {
 PHP;
         file_put_contents($this->outputPath . '/endpoints/auth.php', $content);
     }
-    
-    private function generateAuthMe() {
+
+    private function generateAuthMe()
+    {
         $content = <<<'PHP'
 <?php
 require_once __DIR__ . '/../config/helpers.php';
@@ -819,13 +877,26 @@ if($userData) {
 PHP;
         file_put_contents($this->outputPath . '/auth/me.php', $content);
     }
-    
+
     // ===== HTACCESS =====
-    
-    private function generateHtaccess() {
+
+    private function generateHtaccess()
+    {
         // 1. .htaccess per Apache
         $rootHtaccess = <<<'HTACCESS'
 RewriteEngine On
+
+# CORS Headers per Altervista
+<IfModule mod_headers.c>
+    Header always set Access-Control-Allow-Origin "*"
+    Header always set Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
+    Header always set Access-Control-Allow-Headers "Content-Type, Authorization, X-Requested-With"
+    Header always set Access-Control-Max-Age "3600"
+</IfModule>
+
+# Handle preflight OPTIONS requests
+RewriteCond %{REQUEST_METHOD} OPTIONS
+RewriteRule ^(.*)$ $1 [R=200,L]
 
 # Route /api/auth/* to endpoints/auth.php
 RewriteRule ^api/auth/(.*)$ endpoints/auth.php [QSA,L]
@@ -841,11 +912,23 @@ Options -Indexes
 
 HTACCESS;
         file_put_contents($this->outputPath . '/.htaccess', $rootHtaccess);
-        
+
         // 2. index.php router per PHP built-in server
         $indexRouter = <<<'PHP'
 <?php
 // Router per server PHP built-in
+
+// CORS Headers - SEMPRE per primo
+header("Access-Control-Allow-Origin: *");
+header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
+header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With");
+header("Access-Control-Max-Age: 3600");
+
+// Handle preflight OPTIONS
+if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
+    http_response_code(200);
+    exit(0);
+}
 
 $request_uri = $_SERVER['REQUEST_URI'];
 $request_method = $_SERVER['REQUEST_METHOD'];
@@ -887,18 +970,20 @@ echo json_encode([
 PHP;
         file_put_contents($this->outputPath . '/index.php', $indexRouter);
     }
-    
+
     // ===== DOCUMENTAZIONE =====
-    
-    private function generateDocumentation($config) {
+
+    private function generateDocumentation($config)
+    {
         $this->generateReadme($config);
         $this->generateAuthDoc();
     }
-    
-    private function generateReadme($config) {
+
+    private function generateReadme($config)
+    {
         $currentDbConfig = $config[getDatabaseName()] ?? [];
         $enabledTables = $this->getEnabledTables($currentDbConfig);
-        
+
         $content = "# Generated API\n\n";
         $content .= "API REST generata automaticamente per il database: **" . getDatabaseName() . "**\n\n";
         $content .= "## Deployment\n\n";
@@ -906,7 +991,7 @@ PHP;
         $content .= "2. Configura il database in `config/database.php`\n";
         $content .= "3. Assicurati che `.htaccess` sia abilitato (mod_rewrite)\n\n";
         $content .= "## Endpoint Disponibili\n\n";
-        
+
         foreach ($enabledTables as $tableName => $tableConfig) {
             $content .= "### {$tableName}\n\n";
             $content .= "- `GET /api/{$tableName}` - Lista tutti\n";
@@ -915,17 +1000,18 @@ PHP;
             $content .= "- `PUT /api/{$tableName}/{id}` - Aggiorna\n";
             $content .= "- `DELETE /api/{$tableName}/{id}` - Elimina\n\n";
         }
-        
+
         $content .= "## Autenticazione\n\n";
         $content .= "- `POST /api/auth/login` - Login con email/password\n";
         $content .= "- `GET /api/auth/me` - Info utente corrente\n\n";
         $content .= "Vedi `AUTH.md` per dettagli completi.\n\n";
         $content .= "Generato il: " . date('Y-m-d H:i:s') . "\n";
-        
+
         file_put_contents($this->outputPath . '/README.md', $content);
     }
-    
-    private function generateAuthDoc() {
+
+    private function generateAuthDoc()
+    {
         $content = <<<'MARKDOWN'
 # Documentazione Autenticazione
 
@@ -946,7 +1032,7 @@ PHP;
 {
   "status": 200,
   "data": {
-    "token": "eyJ0eXAiOiJKV1QiLCJhbGc...",
+    "token": "h3eri3u2seriovrglogri...",
     "user": {
       "id": 1,
       "email": "utente@example.com",
@@ -990,25 +1076,28 @@ Il token JWT ha validità di **24 ore**.
 MARKDOWN;
         file_put_contents($this->outputPath . '/AUTH.md', $content);
     }
-    
+
     // ===== UTILITY =====
-    
-    private function getEnabledTables($currentDbConfig) {
-        return array_filter($currentDbConfig, function($table, $key) {
-            return $key !== '_views' 
-                && substr($key, 0, 6) !== '_view_' 
-                && isset($table['enabled']) 
+
+    private function getEnabledTables($currentDbConfig)
+    {
+        return array_filter($currentDbConfig, function ($table, $key) {
+            return $key !== '_views'
+                && substr($key, 0, 6) !== '_view_'
+                && isset($table['enabled'])
                 && $table['enabled'] === true;
         }, ARRAY_FILTER_USE_BOTH);
     }
-    
-    private function getTableColumns($tableName) {
+
+    private function getTableColumns($tableName)
+    {
         $db = db();
         $stmt = $db->query("DESCRIBE `{$tableName}`");
         return $stmt->fetchAll();
     }
-    
-    private function getPrimaryKey($columns) {
+
+    private function getPrimaryKey($columns)
+    {
         foreach ($columns as $column) {
             if ($column['Key'] === 'PRI') {
                 return $column['Field'];
@@ -1016,12 +1105,14 @@ MARKDOWN;
         }
         return 'id';
     }
-    
-    private function toCamelCase($string) {
+
+    private function toCamelCase($string)
+    {
         return str_replace(' ', '', ucwords(str_replace('_', ' ', $string)));
     }
-    
-    private function loadConfig() {
+
+    private function loadConfig()
+    {
         if (file_exists($this->configFile)) {
             return json_decode(file_get_contents($this->configFile), true) ?? [];
         }

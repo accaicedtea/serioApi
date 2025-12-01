@@ -264,7 +264,8 @@ class GeneratorController extends Controller {
         $config = loadApiConfig();
         
         // Ottieni il nome del database corrente
-        $dbConfig = require __DIR__ . '/../../config/database.php';
+        require_once __DIR__ . '/../../config/database.php';
+        $dbConfig = getDatabaseConfig();
         $databaseName = $dbConfig['dbname'] ?? 'unknown';
         
         // Assicurati che il database esista nella config

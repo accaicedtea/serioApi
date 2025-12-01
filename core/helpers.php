@@ -86,7 +86,8 @@ function db(): PDO {
  * Ottiene il nome del database corrente dalla configurazione
  */
 function getDatabaseName(): string {
-    $dbConfig = require __DIR__ . '/../config/database.php';
+    require_once __DIR__ . '/../config/database.php';
+    $dbConfig = getDatabaseConfig();
     return $dbConfig['dbname'] ?? 'unknown';
 }
 

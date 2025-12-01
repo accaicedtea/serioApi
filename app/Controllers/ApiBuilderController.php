@@ -14,12 +14,19 @@ class ApiBuilderController extends Controller
         $config = $this->loadConfig();
         $currentDbConfig = $config[getDatabaseName()] ?? [];
         $enabledTables = $this->getEnabledTables($currentDbConfig);
+        
+        // Conta le viste personalizzate dalla sezione _views
+        $viewsCount = 0;
+        if (isset($currentDbConfig['_views'])) {
+            $viewsCount = count($currentDbConfig['_views']);
+        }
 
         $data = [
             'title' => 'API Builder - Generatore',
             'config' => $currentDbConfig,
             'databaseName' => getDatabaseName(),
             'enabledCount' => count($enabledTables),
+            'viewsCount' => $viewsCount,
             'outputPath' => $this->outputPath,
         ];
 
@@ -45,25 +52,25 @@ class ApiBuilderController extends Controller
                 throw new \Exception("Configurazione non trovata per il database: " . getDatabaseName());
             }
 
-            // 1. Crea struttura cartelle
+            // Crea struttura cartelle
             $this->createDirectoryStructure();
 
-            // 2. Genera file di configurazione
+            // Genera file di configurazione
             $this->generateConfigFiles();
 
-            // 3. Genera middleware
+            // Genera middleware
             $this->generateMiddleware();
 
-            // 4. Genera modelli ed endpoint per ogni tabella abilitata
+            // Genera modelli ed endpoint per ogni tabella abilitata
             $this->generateTablesApi($currentDbConfig);
 
-            // 5. Genera auth endpoint e modello User
+            // Genera auth endpoint e modello User
             $this->generateAuthApi();
 
-            // 6. Genera .htaccess
+            // Genera .htaccess
             $this->generateHtaccess();
 
-            // 7. Genera documentazione
+            // Genera documentazione
             $this->generateDocumentation($config);
 
             header('Location: /generator/builder?success=1');
@@ -119,23 +126,17 @@ class ApiBuilderController extends Controller
 
     private function generateDatabaseConfig()
     {
-        $dbConfig = require __DIR__ . '/../../config/database.php';
-        
-        // Usa sempre production per le API generate
-        $envConfig = $dbConfig;
-        if (isset($dbConfig['production'])) {
-            $envConfig = $dbConfig['production'];
-        } elseif (isset($dbConfig['development'])) {
-            $envConfig = $dbConfig['development'];
-        }
+        require_once __DIR__ . '/../../config/database.php';
+        $dbConfig = getDatabaseConfig('production');
+
 
         $content = <<<PHP
 <?php
 // Database configuration
 define('DB_HOST', '127.0.0.1');
-define('DB_NAME', '{$envConfig['dbname']}');
-define('DB_USER', '{$envConfig['user']}');
-define('DB_PASS', '{$envConfig['pass']}');
+define('DB_NAME', '{$dbConfig['dbname']}');
+define('DB_USER', '{$dbConfig['user']}');
+define('DB_PASS', '{$dbConfig['pass']}');
 
 class Database {
     private \$host = DB_HOST;
@@ -254,7 +255,7 @@ header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
 header("Access-Control-Max-Age: 3600");
 header("Access-Control-Allow-Headers: Content-Type, Access-Control-Allow-Headers, Authorization, X-Requested-With");
 
-// Handle preflight OPTIONS request
+// Richieste preflight OPTIONS
 if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
     http_response_code(200);
     exit(0);
@@ -287,12 +288,6 @@ function sendResponse($status, $data = null, $message = null) {
     exit;
 }
 
-/**
- * Escape HTML per prevenire XSS
- */
-function e($value) {
-    return htmlspecialchars($value ?? '', ENT_QUOTES, 'UTF-8');
-}
 
 PHP;
         file_put_contents($this->outputPath . '/config/helpers.php', $content);
@@ -924,7 +919,7 @@ header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With");
 header("Access-Control-Max-Age: 3600");
 
-// Handle preflight OPTIONS
+// Richieste preflight OPTIONS
 if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
     http_response_code(200);
     exit(0);
@@ -976,105 +971,324 @@ PHP;
     private function generateDocumentation($config)
     {
         $this->generateReadme($config);
-        $this->generateAuthDoc();
     }
 
     private function generateReadme($config)
     {
         $currentDbConfig = $config[getDatabaseName()] ?? [];
         $enabledTables = $this->getEnabledTables($currentDbConfig);
+        $databaseName = getDatabaseName();
+        $viewsCount = isset($currentDbConfig['_views']) ? count($currentDbConfig['_views']) : 0;
 
-        $content = "# Generated API\n\n";
-        $content .= "API REST generata automaticamente per il database: **" . getDatabaseName() . "**\n\n";
-        $content .= "## Deployment\n\n";
-        $content .= "1. Carica questa cartella sul tuo server web\n";
-        $content .= "2. Configura il database in `config/database.php`\n";
-        $content .= "3. Assicurati che `.htaccess` sia abilitato (mod_rewrite)\n\n";
-        $content .= "## Endpoint Disponibili\n\n";
+        $content = "# API REST - {$databaseName}\n\n";
+        $content .= "API REST generata automaticamente per il database: **{$databaseName}**\n\n";
+        $content .= "📅 **Generato il:** " . date('d/m/Y H:i:s') . "\n";
+        $content .= "📊 **Tabelle abilitate:** " . count($enabledTables) . "\n";
+        $content .= "👁️ **Viste personalizzate:** {$viewsCount}\n\n";
+        
+        $content .= "---\n\n";
+        $content .= "## 📋 Indice\n\n";
+        $content .= "1. [Deployment](#-deployment)\n";
+        $content .= "2. [Struttura del Progetto](#-struttura-del-progetto)\n";
+        $content .= "3. [Configurazione](#%EF%B8%8F-configurazione)\n";
+        $content .= "4. [Endpoint Disponibili](#-endpoint-disponibili)\n";
+        $content .= "5. [Autenticazione](#-autenticazione)\n";
+        $content .= "6. [Sicurezza e Rate Limiting](#-sicurezza-e-rate-limiting)\n";
+        $content .= "7. [Gestione Errori](#-gestione-errori)\n";
+        $content .= "8. [Esempi di Utilizzo](#-esempi-di-utilizzo)\n\n";
+        
+        $content .= "---\n\n";
+        $content .= "## 🚀 Deployment\n\n";
+        $content .= "### Requisiti\n";
+        $content .= "- PHP 7.4 o superiore\n";
+        $content .= "- MySQL 5.7 o superiore\n";
+        $content .= "- Apache con mod_rewrite abilitato\n";
+        $content .= "- Estensioni PHP: PDO, pdo_mysql, json\n\n";
+        $content .= "### Installazione\n\n";
+        $content .= "1. **Carica i file sul server**\n";
+        $content .= "   ```bash\n";
+        $content .= "   # Via FTP o tramite git\n";
+        $content .= "   scp -r ./generated-api/* utente@server:/percorso/api/\n";
+        $content .= "   ```\n\n";
+        $content .= "2. **Configura il database**\n";
+        $content .= "   Modifica `config/database.php` con le tue credenziali:\n";
+        $content .= "   ```php\n";
+        $content .= "   define('DB_HOST', '127.0.0.1');\n";
+        $content .= "   define('DB_NAME', '{$databaseName}');\n";
+        $content .= "   define('DB_USER', 'tuo_utente');\n";
+        $content .= "   define('DB_PASS', 'tua_password');\n";
+        $content .= "   ```\n\n";
+        $content .= "3. **Verifica .htaccess**\n";
+        $content .= "   Assicurati che il file `.htaccess` sia presente e che mod_rewrite sia attivo\n\n";
+        $content .= "4. **Test**\n";
+        $content .= "   ```bash\n";
+        $content .= "   curl https://tuodominio.com/api/\n";
+        $content .= "   ```\n\n";
+        
+        $content .= "---\n\n";
+        $content .= "## 📁 Struttura del Progetto\n\n";
+        $content .= "```\n";
+        $content .= "generated-api/\n";
+        $content .= "├── .htaccess              # Configurazione Apache\n";
+        $content .= "├── index.php              # Router principale\n";
+        $content .= "├── cors.php               # Gestione CORS\n";
+        $content .= "├── config/\n";
+        $content .= "│   ├── database.php       # Configurazione DB e classe Database\n";
+        $content .= "│   └── helpers.php        # Funzioni helper globali\n";
+        $content .= "├── middleware/\n";
+        $content .= "│   ├── auth.php           # Verifica JWT token\n";
+        $content .= "│   └── rate_limit.php     # Limitazione richieste\n";
+        $content .= "├── models/\n";
+        $content .= "│   ├── User.php           # Modello utente\n";
+        $content .= "│   └── [Altri modelli]    # Un file per ogni tabella\n";
+        $content .= "├── endpoints/\n";
+        $content .= "│   └── [tabelle].php      # Endpoint CRUD per ogni tabella\n";
+        $content .= "└── auth/\n";
+        $content .= "    ├── login.php          # Endpoint login\n";
+        $content .= "    └── me.php             # Endpoint info utente\n";
+        $content .= "```\n\n";
+        
+        $content .= "---\n\n";
+        $content .= "## ⚙️ Configurazione\n\n";
+        $content .= "### Database\n";
+        $content .= "La classe `Database` in `config/database.php` fornisce metodi per:\n";
+        $content .= "- Connessione automatica con PDO\n";
+        $content .= "- Prepared statements per sicurezza\n";
+        $content .= "- Gestione transazioni\n";
+        $content .= "- Query e metodi helper\n\n";
+        $content .= "### CORS\n";
+        $content .= "Il file `cors.php` gestisce le policy CORS. Per modificare i domini consentiti:\n";
+        $content .= "```php\n";
+        $content .= "header('Access-Control-Allow-Origin: https://tuodominio.com');\n";
+        $content .= "```\n\n";
+        
+        $content .= "---\n\n";
+        $content .= "## 📡 Endpoint Disponibili\n\n";
+        $content .= "### Base URL\n";
+        $content .= "```\n";
+        $content .= "https://tuodominio.com/api/\n";
+        $content .= "```\n\n";
 
         foreach ($enabledTables as $tableName => $tableConfig) {
-            $content .= "### {$tableName}\n\n";
-            $content .= "- `GET /api/{$tableName}` - Lista tutti\n";
-            $content .= "- `GET /api/{$tableName}/{id}` - Singolo elemento\n";
-            $content .= "- `POST /api/{$tableName}` - Crea nuovo\n";
-            $content .= "- `PUT /api/{$tableName}/{id}` - Aggiorna\n";
-            $content .= "- `DELETE /api/{$tableName}/{id}` - Elimina\n\n";
+            $authRequired = isset($tableConfig['require_auth']) && $tableConfig['require_auth'] ? '🔒' : '🔓';
+            $rateLimit = $tableConfig['rate_limit'] ?? 100;
+            $rateLimitWindow = $tableConfig['rate_limit_window'] ?? 60;
+            
+            $content .= "### {$authRequired} {$tableName}\n\n";
+            $content .= "**Rate Limit:** {$rateLimit} richieste ogni {$rateLimitWindow} secondi\n\n";
+            $content .= "| Metodo | Endpoint | Descrizione | Auth |\n";
+            $content .= "|--------|----------|-------------|------|\n";
+            $content .= "| GET | `/api/{$tableName}` | Lista tutti gli elementi | " . ($tableConfig['select'] ?? 'all') . " |\n";
+            $content .= "| GET | `/api/{$tableName}/{id}` | Ottieni singolo elemento | " . ($tableConfig['select'] ?? 'all') . " |\n";
+            $content .= "| POST | `/api/{$tableName}` | Crea nuovo elemento | " . ($tableConfig['insert'] ?? 'auth') . " |\n";
+            $content .= "| PUT | `/api/{$tableName}/{id}` | Aggiorna elemento | " . ($tableConfig['update'] ?? 'auth') . " |\n";
+            $content .= "| DELETE | `/api/{$tableName}/{id}` | Elimina elemento | " . ($tableConfig['delete'] ?? 'admin') . " |\n\n";
         }
 
-        $content .= "## Autenticazione\n\n";
-        $content .= "- `POST /api/auth/login` - Login con email/password\n";
-        $content .= "- `GET /api/auth/me` - Info utente corrente\n\n";
-        $content .= "Vedi `AUTH.md` per dettagli completi.\n\n";
-        $content .= "Generato il: " . date('Y-m-d H:i:s') . "\n";
+        // Viste personalizzate
+        if ($viewsCount > 0) {
+            $content .= "### 👁️ Viste Personalizzate\n\n";
+            foreach ($currentDbConfig['_views'] as $viewName => $viewConfig) {
+                $content .= "#### {$viewName}\n";
+                $content .= ($viewConfig['description'] ?? 'Nessuna descrizione') . "\n\n";
+                $content .= "**Endpoint:** `GET /api/{$viewName}`\n\n";
+                $content .= "**Query SQL:**\n```sql\n" . ($viewConfig['query'] ?? '') . "\n```\n\n";
+            }
+        }
+        
+        $content .= "---\n\n";
+        $content .= "## 🔐 Autenticazione\n\n";
+        $content .= "L'API utilizza **JWT (JSON Web Tokens)** per l'autenticazione.\n\n";
+        $content .= "### Login\n\n";
+        $content .= "**Endpoint:** `POST /api/auth/login`\n\n";
+        $content .= "**Request Body:**\n";
+        $content .= "```json\n";
+        $content .= "{\n";
+        $content .= "  \"email\": \"utente@example.com\",\n";
+        $content .= "  \"password\": \"password123\"\n";
+        $content .= "}\n";
+        $content .= "```\n\n";
+        $content .= "**Response (200 OK):**\n";
+        $content .= "```json\n";
+        $content .= "{\n";
+        $content .= "  \"status\": 200,\n";
+        $content .= "  \"data\": {\n";
+        $content .= "    \"token\": \"eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...\",\n";
+        $content .= "    \"user\": {\n";
+        $content .= "      \"id\": 1,\n";
+        $content .= "      \"email\": \"utente@example.com\",\n";
+        $content .= "      \"name\": \"Nome Utente\",\n";
+        $content .= "      \"role\": \"user\"\n";
+        $content .= "    }\n";
+        $content .= "  },\n";
+        $content .= "  \"message\": \"Login effettuato con successo\"\n";
+        $content .= "}\n";
+        $content .= "```\n\n";
+        $content .= "### Utilizzo del Token\n\n";
+        $content .= "Includi il token nell'header `Authorization` di ogni richiesta:\n\n";
+        $content .= "```\n";
+        $content .= "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...\n";
+        $content .= "```\n\n";
+        $content .= "### Info Utente Corrente\n\n";
+        $content .= "**Endpoint:** `GET /api/auth/me`\n\n";
+        $content .= "**Headers:**\n";
+        $content .= "```\n";
+        $content .= "Authorization: Bearer [token]\n";
+        $content .= "```\n\n";
+        $content .= "**Response:**\n";
+        $content .= "```json\n";
+        $content .= "{\n";
+        $content .= "  \"status\": 200,\n";
+        $content .= "  \"data\": {\n";
+        $content .= "    \"id\": 1,\n";
+        $content .= "    \"email\": \"utente@example.com\",\n";
+        $content .= "    \"name\": \"Nome Utente\",\n";
+        $content .= "    \"role\": \"user\"\n";
+        $content .= "  }\n";
+        $content .= "}\n";
+        $content .= "```\n\n";
+        $content .= "⏱️ **Validità token:** 24 ore\n\n";
+        
+        $content .= "---\n\n";
+        $content .= "## 🛡️ Sicurezza e Rate Limiting\n\n";
+        $content .= "### Rate Limiting\n";
+        $content .= "Ogni endpoint ha un limite di richieste configurabile per prevenire abusi:\n";
+        $content .= "- Limite default: 100 richieste/minuto\n";
+        $content .= "- Tracking per IP\n";
+        $content .= "- Header di risposta con info sul limite\n\n";
+        $content .= "**Response Headers:**\n";
+        $content .= "```\n";
+        $content .= "X-RateLimit-Limit: 100\n";
+        $content .= "X-RateLimit-Remaining: 95\n";
+        $content .= "X-RateLimit-Reset: 1638360000\n";
+        $content .= "```\n\n";
+        $content .= "### Protezioni Implementate\n";
+        $content .= "- ✅ SQL Injection (PDO Prepared Statements)\n";
+        $content .= "- ✅ XSS (htmlspecialchars su output)\n";
+        $content .= "- ✅ CSRF (token validation)\n";
+        $content .= "- ✅ Rate Limiting\n";
+        $content .= "- ✅ JWT con scadenza\n";
+        $content .= "- ✅ Password hash (bcrypt)\n\n";
+        
+        $content .= "---\n\n";
+        $content .= "## ⚠️ Gestione Errori\n\n";
+        $content .= "Tutte le risposte seguono un formato standard:\n\n";
+        $content .= "### Success Response\n";
+        $content .= "```json\n";
+        $content .= "{\n";
+        $content .= "  \"status\": 200,\n";
+        $content .= "  \"data\": { ... },\n";
+        $content .= "  \"message\": \"Operazione completata\"\n";
+        $content .= "}\n";
+        $content .= "```\n\n";
+        $content .= "### Error Response\n";
+        $content .= "```json\n";
+        $content .= "{\n";
+        $content .= "  \"status\": 400,\n";
+        $content .= "  \"error\": \"Descrizione errore\",\n";
+        $content .= "  \"message\": \"Messaggio user-friendly\"\n";
+        $content .= "}\n";
+        $content .= "```\n\n";
+        $content .= "### Codici di Stato HTTP\n";
+        $content .= "| Codice | Significato |\n";
+        $content .= "|--------|-------------|\n";
+        $content .= "| 200 | Successo |\n";
+        $content .= "| 201 | Creato |\n";
+        $content .= "| 400 | Bad Request |\n";
+        $content .= "| 401 | Non autorizzato |\n";
+        $content .= "| 403 | Accesso negato |\n";
+        $content .= "| 404 | Non trovato |\n";
+        $content .= "| 429 | Troppe richieste (rate limit) |\n";
+        $content .= "| 500 | Errore server |\n\n";
+        
+        $content .= "---\n\n";
+        $content .= "## 💻 Esempi di Utilizzo\n\n";
+        $content .= "### JavaScript / Fetch API\n\n";
+        $content .= "```javascript\n";
+        $content .= "// Login\n";
+        $content .= "async function login(email, password) {\n";
+        $content .= "  const response = await fetch('https://tuodominio.com/api/auth/login', {\n";
+        $content .= "    method: 'POST',\n";
+        $content .= "    headers: { 'Content-Type': 'application/json' },\n";
+        $content .= "    body: JSON.stringify({ email, password })\n";
+        $content .= "  });\n";
+        $content .= "  const { data } = await response.json();\n";
+        $content .= "  localStorage.setItem('token', data.token);\n";
+        $content .= "  return data;\n";
+        $content .= "}\n\n";
+        $content .= "// GET con autenticazione\n";
+        $content .= "async function getData(endpoint) {\n";
+        $content .= "  const token = localStorage.getItem('token');\n";
+        $content .= "  const response = await fetch(`https://tuodominio.com/api/\${endpoint}`, {\n";
+        $content .= "    headers: { 'Authorization': `Bearer \${token}` }\n";
+        $content .= "  });\n";
+        $content .= "  return await response.json();\n";
+        $content .= "}\n\n";
+        $content .= "// POST con autenticazione\n";
+        $content .= "async function createItem(endpoint, data) {\n";
+        $content .= "  const token = localStorage.getItem('token');\n";
+        $content .= "  const response = await fetch(`https://tuodominio.com/api/\${endpoint}`, {\n";
+        $content .= "    method: 'POST',\n";
+        $content .= "    headers: {\n";
+        $content .= "      'Content-Type': 'application/json',\n";
+        $content .= "      'Authorization': `Bearer \${token}`\n";
+        $content .= "    },\n";
+        $content .= "    body: JSON.stringify(data)\n";
+        $content .= "  });\n";
+        $content .= "  return await response.json();\n";
+        $content .= "}\n";
+        $content .= "```\n\n";
+        $content .= "### cURL\n\n";
+        $content .= "```bash\n";
+        $content .= "# Login\n";
+        $content .= "curl -X POST https://tuodominio.com/api/auth/login \\\n";
+        $content .= "  -H \"Content-Type: application/json\" \\\n";
+        $content .= "  -d '{\"email\":\"test@test.com\",\"password\":\"123456\"}'\n\n";
+        $content .= "# GET con token\n";
+        $content .= "curl https://tuodominio.com/api/tabella \\\n";
+        $content .= "  -H \"Authorization: Bearer eyJ0eXAi...\"\n\n";
+        $content .= "# POST con token\n";
+        $content .= "curl -X POST https://tuodominio.com/api/tabella \\\n";
+        $content .= "  -H \"Content-Type: application/json\" \\\n";
+        $content .= "  -H \"Authorization: Bearer eyJ0eXAi...\" \\\n";
+        $content .= "  -d '{\"campo\":\"valore\"}'\n";
+        $content .= "```\n\n";
+        $content .= "### PHP\n\n";
+        $content .= "```php\n";
+        $content .= "<?php\n";
+        $content .= "// Login\n";
+        $content .= "\$ch = curl_init('https://tuodominio.com/api/auth/login');\n";
+        $content .= "curl_setopt(\$ch, CURLOPT_POST, true);\n";
+        $content .= "curl_setopt(\$ch, CURLOPT_POSTFIELDS, json_encode([\n";
+        $content .= "    'email' => 'test@test.com',\n";
+        $content .= "    'password' => '123456'\n";
+        $content .= "]));\n";
+        $content .= "curl_setopt(\$ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);\n";
+        $content .= "curl_setopt(\$ch, CURLOPT_RETURNTRANSFER, true);\n";
+        $content .= "\$response = curl_exec(\$ch);\n";
+        $content .= "\$data = json_decode(\$response, true);\n";
+        $content .= "\$token = \$data['data']['token'];\n\n";
+        $content .= "// GET con token\n";
+        $content .= "\$ch = curl_init('https://tuodominio.com/api/tabella');\n";
+        $content .= "curl_setopt(\$ch, CURLOPT_HTTPHEADER, [\n";
+        $content .= "    'Authorization: Bearer ' . \$token\n";
+        $content .= "]);\n";
+        $content .= "curl_setopt(\$ch, CURLOPT_RETURNTRANSFER, true);\n";
+        $content .= "\$response = curl_exec(\$ch);\n";
+        $content .= "```\n\n";
+        
+        $content .= "---\n\n";
+        $content .= "## 📞 Supporto\n\n";
+        $content .= "Per problemi o domande:\n";
+        $content .= "- Verifica i log del server PHP\n";
+        $content .= "- Controlla le credenziali database in `config/database.php`\n";
+        $content .= "- Assicurati che mod_rewrite sia attivo\n";
+        $content .= "- Verifica i permessi delle cartelle (755 per directory, 644 per file)\n\n";
+        
+        $content .= "---\n\n";
+        $content .= "**🎉 API generata con successo!**\n";
 
         file_put_contents($this->outputPath . '/README.md', $content);
-    }
-
-    private function generateAuthDoc()
-    {
-        $content = <<<'MARKDOWN'
-# Documentazione Autenticazione
-
-## Login
-
-**Endpoint:** `POST /api/auth/login`
-
-**Body:**
-```json
-{
-  "email": "utente@example.com",
-  "password": "password"
-}
-```
-
-**Risposta:**
-```json
-{
-  "status": 200,
-  "data": {
-    "token": "h3eri3u2seriovrglogri...",
-    "user": {
-      "id": 1,
-      "email": "utente@example.com",
-      "name": "Nome Utente",
-      "role": "user"
-    }
-  },
-  "message": "Login effettuato con successo"
-}
-```
-
-## Utilizzo Token
-
-Aggiungi il token nell'header Authorization:
-
-```
-Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGc...
-```
-
-## Esempio JavaScript
-
-```javascript
-// Login
-const response = await fetch('https://tuodominio.com/api/auth/login', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ email: 'test@test.com', password: '123456' })
-});
-
-const { data } = await response.json();
-localStorage.setItem('token', data.token);
-
-// Richiesta autenticata
-const protected = await fetch('https://tuodominio.com/api/tabella/1', {
-  headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-});
-```
-
-Il token JWT ha validità di **24 ore**.
-
-MARKDOWN;
-        file_put_contents($this->outputPath . '/AUTH.md', $content);
     }
 
     // ===== UTILITY =====

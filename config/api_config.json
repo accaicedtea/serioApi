@@ -26,7 +26,17 @@
             "enabled": false
         },
         "menu_categories": {
-            "enabled": false
+            "enabled": true,
+            "rate_limit": 100,
+            "rate_limit_window": 60,
+            "max_results": 100,
+            "require_auth": false,
+            "enable_cache": false,
+            "cache_ttl": 300,
+            "select": "all",
+            "insert": "auth",
+            "update": "auth",
+            "delete": "admin"
         },
         "menu_item_allergens": {
             "enabled": false
@@ -52,6 +62,19 @@
         "users": {
             "enabled": false
         },
+        "_view_testoo": {
+            "enabled": true,
+            "rate_limit": 100,
+            "rate_limit_window": 60,
+            "max_results": 100,
+            "require_auth": false,
+            "enable_cache": false,
+            "cache_ttl": 300,
+            "select": "all",
+            "insert": "auth",
+            "update": "auth",
+            "delete": "admin"
+        },
         "_views": {
             "testoo": {
                 "name": "testoo",
@@ -64,31 +87,6 @@
                 "enable_cache": false,
                 "cache_ttl": 300
             }
-        },
-        "_view_testoo": {
-            "enabled": true,
-            "is_virtual": true,
-            "view_name": "testoo"
-        }
-    },
-    "database2": {
-        "test_table": {
-            "enabled": true,
-            "rate_limit": 50,
-            "rate_limit_window": 60,
-            "max_results": 50,
-            "require_auth": true,
-            "enable_cache": true,
-            "cache_ttl": 600,
-            "select": "auth",
-            "insert": "admin",
-            "update": "admin",
-            "delete": "admin"
-        }
-    },
-    "database3": {
-        "sample_table": {
-            "enabled": false
         }
     }
 }

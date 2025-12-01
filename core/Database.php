@@ -6,7 +6,8 @@ class Database {
 
     public function __construct() {
         if ($this->pdo === null) {
-            $config = require __DIR__ . '/../config/database.php';
+            require_once __DIR__ . '/../config/database.php';
+            $config = getDatabaseConfig();
             
             if ($config === null) {
                 throw new \Exception('File di configurazione non trovato.');

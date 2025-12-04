@@ -1,66 +1,50 @@
 <?php
-
+// Semplice handler JWT; i valori tra __PLACEHOLDER__ saranno sostituiti dal builder.
 class JWTHandler {
-    private $secret_key = "d72937b1639933aed25cb50d65f63cb7";
-    private $algorithm = "HS256";
-    
-    public function generateToken($user_data) {
-        $header = json_encode(['typ' => 'JWT', 'alg' => $this->algorithm]);
-        
-        $payload = json_encode([
-            'user_id' => $user_data['id'],
-            'email' => $user_data['email'],
-            'role' => $user_data['role'],
-            'iat' => time(),
-            'exp' => time() + (24 * 60 * 60) // 24 hours
-        ]);
-        
-        $base64Header = str_replace(['+', '/', '='], ['-', '_', ''], base64_encode($header));
-        $base64Payload = str_replace(['+', '/', '='], ['-', '_', ''], base64_encode($payload));
-        
-        $signature = hash_hmac('sha256', $base64Header . "." . $base64Payload, $this->secret_key, true);
-        $base64Signature = str_replace(['+', '/', '='], ['-', '_', ''], base64_encode($signature));
-        
-        return $base64Header . "." . $base64Payload . "." . $base64Signature;
+    private $secret_key = '__JWT_SECRET__';
+    private $algorithm  = '__JWT_ALGO__'; // HS256, HS384, HS512
+    private $ttl        = __JWT_TTL__;    // in secondi
+
+    private function b64url($data) {
+        return rtrim(strtr(base64_encode($data), '+/', '-_'), '=');
     }
-    
-    public function validateToken($token) {
+
+    public function generateToken(array $user) {
+        $header = ['typ' => 'JWT', 'alg' => $this->algorithm];
+        $now = time();
+        $payload = [
+            'sub' => (string)($user['id'] ?? ''),
+            'email' => $user['email'] ?? '',
+            'role' => $user['role'] ?? 'user',
+            'name' => $user['name'] ?? '',
+            'iat' => $now,
+            'nbf' => $now,
+            'exp' => $now + $this->ttl,
+        ];
+        $h = $this->b64url(json_encode($header));
+        $p = $this->b64url(json_encode($payload));
+        $s = $this->b64url(hash_hmac('sha256', "$h.$p", $this->secret_key, true));
+        return "$h.$p.$s";
+    }
+
+    public function validateToken(string $token) {
         $parts = explode('.', $token);
-        
-        if (count($parts) !== 3) {
-            return false;
-        }
-        
-        $header = $parts[0];
-        $payload = $parts[1];
-        $signature = $parts[2];
-        
-        $expectedSignature = hash_hmac('sha256', $header . "." . $payload, $this->secret_key, true);
-        $expectedSignature = str_replace(['+', '/', '='], ['-', '_', ''], base64_encode($expectedSignature));
-        
-        if ($signature !== $expectedSignature) {
-            return false;
-        }
-        
-        $payloadData = json_decode(base64_decode(str_replace(['-', '_'], ['+', '/'], $payload)), true);
-        
-        if ($payloadData['exp'] < time()) {
-            return false;
-        }
-        
-        return $payloadData;
+        if (count($parts) !== 3) return false;
+        [$h, $p, $s] = $parts;
+        $expected = $this->b64url(hash_hmac('sha256', "$h.$p", $this->secret_key, true));
+        if (!hash_equals($expected, $s)) return false;
+
+        $payload = json_decode(base64_decode(strtr($p, '-_', '+/')), true);
+        if (!is_array($payload)) return false;
+        if (($payload['exp'] ?? 0) < time()) return false;
+        // opzionale: verifica iss/aud
+        return $payload;
     }
-    
-    public function getTokenFromHeader() {
-        $headers = apache_request_headers();
-        
-        if (isset($headers['Authorization'])) {
-            $authHeader = $headers['Authorization'];
-            if (preg_match('/Bearer\s(\S+)/', $authHeader, $matches)) {
-                return $matches[1];
-            }
-        }
-        
+
+    public function getTokenFromHeader(): ?string {
+        $headers = function_exists('getallheaders') ? getallheaders() : [];
+        $auth = $headers['Authorization'] ?? $headers['authorization'] ?? '';
+        if (preg_match('/Bearer\s+(\S+)/', $auth, $m)) return $m[1];
         return null;
     }
 }

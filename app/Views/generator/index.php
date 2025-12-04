@@ -189,15 +189,6 @@
                     <div class="row g-3 mb-3">
                         <div class="col-md-4">
                             <div class="form-check form-switch">
-                                <input type="checkbox" name="<?= $table ?>_require_auth" class="form-check-input"
-                                    id="auth_<?= e($table) ?>"
-                                    <?= ($tableConfig['require_auth'] ?? false) ? 'checked' : '' ?>>
-                                <label class="form-check-label" for="auth_<?= e($table) ?>">Richiedi Auth</label>
-                            </div>
-                        </div>
-
-                        <div class="col-md-4">
-                            <div class="form-check form-switch">
                                 <input type="checkbox" name="<?= $table ?>_enable_cache" class="form-check-input"
                                     id="cache_<?= e($table) ?>"
                                     <?= ($tableConfig['enable_cache'] ?? false) ? 'checked' : '' ?>>
@@ -315,32 +306,26 @@ document.getElementById('configForm').addEventListener('submit', function(e) {
         "<?= e($currentDatabase) ?>": {}
     };
 
-    // Salva configurazioni tabelle nel database corrente
     document.querySelectorAll('.enable-table').forEach(checkbox => {
         const table = checkbox.dataset.table;
         if (checkbox.checked) {
-            config["<?= e($currentDatabase) ?>"][table] = {
-                enabled: true
-            };
+            config["<?= e($currentDatabase) ?>"][table] = { enabled: true };
 
-            // Configurazioni specifiche della tabella
+            // Specifiche tabella
             config["<?= e($currentDatabase) ?>"][table].rate_limit = parseInt(document.querySelector(
                 `input[name="${table}_rate_limit"]`).value);
-            config["<?= e($currentDatabase) ?>"][table].rate_limit_window = parseInt(document
-                .querySelector(
-                    `input[name="${table}_rate_window"]`).value);
+            config["<?= e($currentDatabase) ?>"][table].rate_limit_window = parseInt(document.querySelector(
+                `input[name="${table}_rate_window"]`).value);
             config["<?= e($currentDatabase) ?>"][table].max_results = parseInt(document.querySelector(
                 `input[name="${table}_max_results"]`).value);
-            config["<?= e($currentDatabase) ?>"][table].require_auth = document.querySelector(
-                    `input[name="${table}_require_auth"]`)
-                .checked;
+
+            // RIMOSSO: require_auth
             config["<?= e($currentDatabase) ?>"][table].enable_cache = document.querySelector(
-                    `input[name="${table}_enable_cache"]`)
-                .checked;
+                `input[name="${table}_enable_cache"]`).checked;
             config["<?= e($currentDatabase) ?>"][table].cache_ttl = parseInt(document.querySelector(
                 `input[name="${table}_cache_ttl"]`).value);
 
-            // Raccogli permessi per ogni operazione
+            // Permessi operazioni
             ['select', 'insert', 'update', 'delete'].forEach(op => {
                 const selected = document.querySelector(`input[name="${table}_${op}"]:checked`);
                 if (selected) {
@@ -348,9 +333,7 @@ document.getElementById('configForm').addEventListener('submit', function(e) {
                 }
             });
         } else {
-            config["<?= e($currentDatabase) ?>"][table] = {
-                enabled: false
-            };
+            config["<?= e($currentDatabase) ?>"][table] = { enabled: false };
         }
     });
 

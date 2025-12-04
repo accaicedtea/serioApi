@@ -14,7 +14,7 @@ class ApiBuilderController extends Controller
         $config = $this->loadConfig();
         $currentDbConfig = $config[getDatabaseName()] ?? [];
         $enabledTables = $this->getEnabledTables($currentDbConfig);
-        
+
         // Conta le viste personalizzate dalla sezione _views
         $viewsCount = 0;
         if (isset($currentDbConfig['_views'])) {
@@ -71,7 +71,7 @@ class ApiBuilderController extends Controller
             $this->generateHtaccess();
 
             // Genera documentazione
-            $this->generateDocumentation($config);
+            $this->generateReadme($config);
 
             header('Location: /generator/builder?success=1');
             exit;
@@ -91,7 +91,9 @@ class ApiBuilderController extends Controller
             $this->outputPath . '/middleware',
             $this->outputPath . '/models',
             $this->outputPath . '/endpoints',
-            $this->outputPath . '/auth'
+            $this->outputPath . '/auth',
+            $this->outputPath . '/storage',
+            $this->outputPath . '/storage/cache'
         ];
 
         foreach ($dirs as $dir) {
@@ -111,6 +113,9 @@ class ApiBuilderController extends Controller
         // 2. jwt.php - usa JWT_SECRET dall'ENV
         $this->generateJwtConfig();
 
+        // 3. cache.php - usa variabili ENV per abilitazione/TTL/dir
+        $this->generateCacheConfig();
+
         // 3. helpers.php - funzioni globali unificate
         $this->generateHelpersFile();
 
@@ -122,6 +127,45 @@ class ApiBuilderController extends Controller
 
         // 6. .htaccess per proteggere config
         file_put_contents($this->outputPath . '/config/.htaccess', "Deny from all\n");
+    }
+
+    // ===== CACHE CONFIG =====
+    private function generateCacheConfig()
+    {
+        $templatePath = dirname(__DIR__) . '/Builder/Cache.php';
+        $outDir = $this->outputPath . '/config';
+        $outFile = $outDir . '/cache.php';
+
+        if (!is_dir($outDir)) {
+            mkdir($outDir, 0775, true);
+        }
+
+        if (!is_file($templatePath)) {
+            throw new \RuntimeException("Template Cache non trovato: {$templatePath}");
+        }
+
+        $tpl = file_get_contents($templatePath);
+
+        $vars = [
+            '__CACHE_ENABLED__' => env('CACHE_ENABLED', true) ? 'true' : 'false',
+            '__CACHE_TTL__' => (string) env('CACHE_TTL', 300),
+            '__CACHE_DIR__' => "'" . $this->outputPath . "/storage/cache'",
+        ];
+
+        // Se mancano i placeholder, prova a sostituire i pattern comuni
+        if (strpos($tpl, '__CACHE_ENABLED__') === false) {
+            $tpl = preg_replace('/(private\s+\$enabled\s*=\s*)(true|false)/', '$1__CACHE_ENABLED__', $tpl);
+        }
+        if (strpos($tpl, '__CACHE_TTL__') === false) {
+            $tpl = preg_replace('/(private\s+\$ttl\s*=\s*)\d+/', '$1__CACHE_TTL__', $tpl);
+        }
+        if (strpos($tpl, '__CACHE_DIR__') === false) {
+            $tpl = preg_replace('/(private\s+\$dir\s*=\s*)([^
+;]+)/', '$1__CACHE_DIR__', $tpl);
+        }
+
+        $rendered = strtr($tpl, $vars);
+        file_put_contents($outFile, $rendered);
     }
 
     private function generateDatabaseConfig()
@@ -164,157 +208,66 @@ class Database {
 PHP;
         file_put_contents($this->outputPath . '/config/database.php', $content);
     }
-
+    // ===== JWT CONFIG =====
     private function generateJwtConfig()
     {
-        $jwtSecret = env('JWT_SECRET', 'd72937b1639933aed25cb50d65f63cb7');
+        // Template JWT di riferimento (app/Builder/JWT.php)
+        $templatePath = dirname(__DIR__) . '/Builder/JWT.php';
+        $outDir = $this->outputPath . '/config';
+        $outFile = $outDir . '/jwt.php';
 
-        $content = <<<PHP
-<?php
+        if (!is_file($templatePath)) {
+            throw new \RuntimeException("Template JWT non trovato: {$templatePath}");
+        }
+        if (!is_dir($outDir)) {
+            mkdir($outDir, 0775, true);
+        }
 
-class JWTHandler {
-    private \$secret_key = "{$jwtSecret}";
-    private \$algorithm = "HS256";
-    
-    public function generateToken(\$user_data) {
-        \$header = json_encode(['typ' => 'JWT', 'alg' => \$this->algorithm]);
-        
-        \$payload = json_encode([
-            'user_id' => \$user_data['id'],
-            'email' => \$user_data['email'],
-            'role' => \$user_data['role'],
-            'name' => \$user_data['name'] ?? '',
-            'iat' => time(),
-            'exp' => time() + (24 * 60 * 60) // 24 hours
-        ]);
-        
-        \$base64Header = str_replace(['+', '/', '='], ['-', '_', ''], base64_encode(\$header));
-        \$base64Payload = str_replace(['+', '/', '='], ['-', '_', ''], base64_encode(\$payload));
-        
-        \$signature = hash_hmac('sha256', \$base64Header . "." . \$base64Payload, \$this->secret_key, true);
-        \$base64Signature = str_replace(['+', '/', '='], ['-', '_', ''], base64_encode(\$signature));
-        
-        return \$base64Header . "." . \$base64Payload . "." . \$base64Signature;
-    }
-    
-    public function validateToken(\$token) {
-        \$parts = explode('.', \$token);
-        
-        if (count(\$parts) !== 3) {
-            return false;
-        }
-        
-        \$header = \$parts[0];
-        \$payload = \$parts[1];
-        \$signature = \$parts[2];
-        
-        \$expectedSignature = hash_hmac('sha256', \$header . "." . \$payload, \$this->secret_key, true);
-        \$expectedSignature = str_replace(['+', '/', '='], ['-', '_', ''], base64_encode(\$expectedSignature));
-        
-        if (\$signature !== \$expectedSignature) {
-            return false;
-        }
-        
-        \$payloadData = json_decode(base64_decode(str_replace(['-', '_'], ['+', '/'], \$payload)), true);
-        
-        if (\$payloadData['exp'] < time()) {
-            return false;
-        }
-        
-        return \$payloadData;
-    }
-    
-    public function getTokenFromHeader() {
-        \$headers = getallheaders();
-        
-        if (!empty(\$headers['Authorization'])) {
-            \$authHeader = \$headers['Authorization'];
-            if (preg_match('/Bearer\s(\S+)/', \$authHeader, \$matches)) {
-                return \$matches[1];
-            }
-        }
-        
-        return null;
-    }
-}
+        // Valori da .env con default
+        $vars = [
+            '__JWT_SECRET__' => env('JWT_SECRET'),
+            '__JWT_ALGO__' => env('JWT_ALGO', 'HS256'),
+            '__JWT_TTL__' => (string) env('JWT_EXPIRES_IN'), // in secondi (24h)
+        ];
 
-PHP;
-        file_put_contents($this->outputPath . '/config/jwt.php', $content);
+        // Carica template
+        $tpl = file_get_contents($templatePath);
+
+        // Se il template non ha i placeholder standard, sostituisci i pattern comuni
+        if (strpos($tpl, '__JWT_SECRET__') === false || strpos($tpl, '__JWT_ALGO__') === false || strpos($tpl, '__JWT_TTL__') === false) {
+            $tpl = preg_replace(
+                [
+                    '/(private\s+\$secret_key\s*=\s*[\'"]).*?([\'"];)/',
+                    '/(private\s+\$algorithm\s*=\s*[\'"]).*?([\'"];)/',
+                    '/(private\s+\$ttl\s*=\s*)\d+(\s*;)/',
+                ],
+                [
+                    '$1__JWT_SECRET__$2',
+                    '$1__JWT_ALGO__$2',
+                    '$1__JWT_TTL__$2',
+                ],
+                $tpl
+            );
+        }
+
+        // Applica le sostituzioni
+        $rendered = strtr($tpl, $vars);
+
+        file_put_contents($outFile, $rendered);
     }
 
+    // ===== HELPERS CONFIG =====
     private function generateHelpersFile()
     {
-        $content = <<<'PHP'
-<?php
-// ===== HELPER FUNCTIONS UNIFICATE =====
-
-// CORS headers
-header("Access-Control-Allow-Origin: *");
-header("Content-Type: application/json; charset=UTF-8");
-header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
-header("Access-Control-Max-Age: 3600");
-header("Access-Control-Allow-Headers: Content-Type, Access-Control-Allow-Headers, Authorization, X-Requested-With");
-
-// Richieste preflight OPTIONS
-if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
-    http_response_code(200);
-    exit(0);
-}
-
-/**
- * Invia una risposta JSON standardizzata
- */
-function sendResponse($status, $data = null, $message = null) {
-    http_response_code($status);
-    
-    $response = [];
-    
-    if ($status >= 400) {
-        $response['error'] = true;
-        $response['message'] = $message ?? 'An error occurred';
-    } else {
-        if ($data !== null) {
-            $response['data'] = $data;
-        }
-        if ($message !== null) {
-            $response['message'] = $message;
-        }
-    }
-    
-    $response['status'] = $status;
-    $response['timestamp'] = time();
-    
-    echo json_encode($response);
-    exit;
-}
-
-
-PHP;
-        file_put_contents($this->outputPath . '/config/helpers.php', $content);
+        // Copia il file helpers.php dal Builder
+        $templatePath = dirname(__DIR__) . '/Builder/helpers.php';
+        copy($templatePath, $this->outputPath . '/config/helpers.php');
     }
 
     private function generateCorsFile()
     {
-        $content = <<<'PHP'
-<?php
-// File CORS standalone per Altervista
-// Includi questo file all'inizio di ogni endpoint
-
-// CORS Headers - Più permissivi per debug
-header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
-header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With, Accept, Origin");
-header("Access-Control-Allow-Credentials: true");
-header("Access-Control-Max-Age: 86400");
-
-// Handle preflight OPTIONS
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    http_response_code(200);
-    exit(0);
-}
-
-PHP;
-        file_put_contents($this->outputPath . '/cors.php', $content);
+        $templatePath = dirname(__DIR__) . '/Builder/cors.php';
+        copy($templatePath, $this->outputPath . '/cors.php');
     }
 
     // ===== MIDDLEWARE =====
@@ -333,135 +286,23 @@ PHP;
 
     private function generateAuthMiddleware()
     {
-        $content = <<<'PHP'
-<?php
-require_once __DIR__ . '/../config/jwt.php';
-
-function requireAuth() {
-    $jwt = new JWTHandler();
-    $token = $jwt->getTokenFromHeader();
-    
-    if(!$token) {
-        sendResponse(401, null, 'Token di autenticazione mancante');
-    }
-    
-    $tokenData = $jwt->validateToken($token);
-    
-    if(!$tokenData) {
-        sendResponse(401, null, 'Token non valido o scaduto');
-    }
-    
-    return $tokenData;
-}
-
-function requireRole($required_role) {
-    $user = requireAuth();
-    
-    if($user['role'] !== $required_role && $user['role'] !== 'admin') {
-        sendResponse(403, null, 'Permessi insufficienti');
-    }
-    
-    return $user;
-}
-
-PHP;
-        file_put_contents($this->outputPath . '/middleware/auth.php', $content);
+        $templatePath = dirname(__DIR__) . '/Builder/auth.php';
+        copy($templatePath, $this->outputPath . '/middleware/auth.php');
     }
 
     private function generateSecurityMiddleware()
     {
-        $content = <<<'PHP'
-<?php
-class SecurityMiddleware {
-    private $db;
-    
-    public function __construct($db) {
-        $this->db = $db;
-    }
-    
-    public function checkRateLimit($endpoint, $limit = 100, $window = 60) {
-        $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
-        $identifier = $ip . ':' . $endpoint;
-        
-        // Verifica se esiste la tabella rate_limits
-        try {
-            $query = "SELECT COUNT(*) as count FROM rate_limits 
-                     WHERE identifier = :identifier 
-                     AND timestamp > DATE_SUB(NOW(), INTERVAL :window SECOND)";
-            
-            $stmt = $this->db->prepare($query);
-            $stmt->bindParam(':identifier', $identifier);
-            $stmt->bindParam(':window', $window, PDO::PARAM_INT);
-            $stmt->execute();
-            
-            $result = $stmt->fetch(PDO::FETCH_ASSOC);
-            $count = $result['count'];
-            
-            if ($count >= $limit) {
-                http_response_code(429);
-                echo json_encode([
-                    'error' => true,
-                    'message' => 'Rate limit exceeded. Try again later.',
-                    'status' => 429
-                ]);
-                exit;
-            }
-            
-            // Registra la richiesta
-            $insertQuery = "INSERT INTO rate_limits (identifier, endpoint, timestamp) VALUES (:identifier, :endpoint, NOW())";
-            $insertStmt = $this->db->prepare($insertQuery);
-            $insertStmt->bindParam(':identifier', $identifier);
-            $insertStmt->bindParam(':endpoint', $endpoint);
-            $insertStmt->execute();
-            
-            // Pulizia vecchi record
-            $cleanQuery = "DELETE FROM rate_limits WHERE timestamp < DATE_SUB(NOW(), INTERVAL 1 HOUR)";
-            $this->db->exec($cleanQuery);
-            
-        } catch (PDOException $e) {
-            // Se la tabella non esiste, ignora il rate limiting
-            return true;
-        }
-        
-        return true;
-    }
-    
-    public function applySecurityHeaders() {
-        header('X-Frame-Options: DENY');
-        header('X-Content-Type-Options: nosniff');
-        header('X-XSS-Protection: 1; mode=block');
-        header('Referrer-Policy: strict-origin-when-cross-origin');
-    }
-}
-
-PHP;
-        file_put_contents($this->outputPath . '/middleware/security.php', $content);
+        $templatePath = dirname(__DIR__) . '/Builder/security.php';
+        copy($templatePath, $this->outputPath . '/middleware/security.php');
     }
 
     private function generateSecurityHelper()
     {
-        $content = <<<'PHP'
-<?php
-require_once __DIR__ . '/security.php';
-require_once __DIR__ . '/../config/database.php';
-
-function applySecurity($endpoint, $limit = 100, $window = 60) {
-    $database = new Database();
-    $db = $database->getConnection();
-    $security = new SecurityMiddleware($db);
-    
-    $security->applySecurityHeaders();
-    $security->checkRateLimit($endpoint, $limit, $window);
-    
-    return $security;
-}
-
-PHP;
-        file_put_contents($this->outputPath . '/middleware/security_helper.php', $content);
+        $templatePath = dirname(__DIR__) . '/Builder/security_helper.php';
+        copy($templatePath, $this->outputPath . '/middleware/security_helper.php');
     }
 
     // ===== GENERAZIONE TABELLE =====
-
     private function generateTablesApi($currentDbConfig)
     {
         foreach ($currentDbConfig as $tableName => $tableConfig) {
@@ -713,164 +554,20 @@ PHP;
 
     private function generateUserModel()
     {
-        $content = <<<'PHP'
-<?php
-require_once __DIR__ . '/../config/database.php';
-
-class User {
-    private $conn;
-    private $table_name = "user_auth";
-
-    public function __construct($db) {
-        $this->conn = $db;
-    }
-
-    public function login($email, $password) {
-        $query = "SELECT * FROM " . $this->table_name . " WHERE email = ? AND is_active = 1 LIMIT 0,1";
-        $stmt = $this->conn->prepare($query);
-        $stmt->bindParam(1, $email);
-        $stmt->execute();
-        
-        $user = $stmt->fetch(PDO::FETCH_ASSOC);
-        
-        if($user && password_verify($password, $user['password'])) {
-            // Aggiorna last_login
-            $update_query = "UPDATE " . $this->table_name . " SET last_login = NOW() WHERE id = ?";
-            $update_stmt = $this->conn->prepare($update_query);
-            $update_stmt->execute([$user['id']]);
-            
-            // Rimuovi password dalla risposta
-            unset($user['password']);
-            return $user;
-        }
-        
-        return false;
-    }
-
-    public function getById($id) {
-        $query = "SELECT id, email, name, role, last_login, created_at FROM " . $this->table_name . " 
-                  WHERE id = ? AND is_active = 1 LIMIT 0,1";
-        $stmt = $this->conn->prepare($query);
-        $stmt->bindParam(1, $id);
-        $stmt->execute();
-        
-        return $stmt->fetch(PDO::FETCH_ASSOC);
-    }
-    
-    public function updatePassword($id, $new_password) {
-        $hashed = password_hash($new_password, PASSWORD_DEFAULT);
-        $query = "UPDATE " . $this->table_name . " SET password = ? WHERE id = ?";
-        $stmt = $this->conn->prepare($query);
-        
-        if($stmt->execute([$hashed, $id])) {
-            return true;
-        }
-        return false;
-    }
-}
-
-PHP;
-        file_put_contents($this->outputPath . '/models/User.php', $content);
+        $templatePath = dirname(__DIR__) . '/Builder/User.php';
+        copy($templatePath, $this->outputPath . '/models/User.php');
     }
 
     private function generateAuthEndpoint()
     {
-        $content = <<<'PHP'
-<?php
-require_once __DIR__ . '/../cors.php';
-require_once __DIR__ . '/../config/helpers.php';
-require_once __DIR__ . '/../config/database.php';
-require_once __DIR__ . '/../config/jwt.php';
-require_once __DIR__ . '/../models/User.php';
-
-$database = new Database();
-$db = $database->getConnection();
-$user = new User($db);
-$jwt = new JWTHandler();
-
-$method = $_SERVER['REQUEST_METHOD'];
-$request_uri = $_SERVER['REQUEST_URI'];
-$path = parse_url($request_uri, PHP_URL_PATH);
-$path_parts = explode('/', $path);
-$action = end($path_parts);
-
-switch($method) {
-    case 'POST':
-        if($action === 'login') {
-            $data = json_decode(file_get_contents("php://input"), true);
-            
-            if(empty($data['email']) || empty($data['password'])) {
-                sendResponse(400, null, 'Email e password sono obbligatori');
-            }
-            
-            $userData = $user->login($data['email'], $data['password']);
-            
-            if($userData) {
-                $token = $jwt->generateToken($userData);
-                
-                sendResponse(200, [
-                    'token' => $token,
-                    'user' => $userData
-                ], 'Login effettuato con successo');
-            } else {
-                sendResponse(401, null, 'Credenziali non valide');
-            }
-        } else {
-            sendResponse(404, null, 'Endpoint non trovato');
-        }
-        break;
-        
-    case 'GET':
-        if($action === 'me') {
-            require_once __DIR__ . '/../middleware/auth.php';
-            $tokenData = requireAuth();
-            
-            $userData = $user->getById($tokenData['user_id']);
-            
-            if($userData) {
-                sendResponse(200, $userData);
-            } else {
-                sendResponse(404, null, 'Utente non trovato');
-            }
-        } else {
-            sendResponse(404, null, 'Endpoint non trovato');
-        }
-        break;
-        
-    default:
-        sendResponse(405, null, 'Metodo non consentito');
-        break;
-}
-
-PHP;
-        file_put_contents($this->outputPath . '/endpoints/auth.php', $content);
+        $templatePath = dirname(__DIR__). '/Builder/ep_auth.php';
+        copy($templatePath, $this->outputPath . '/endpoints/auth.php');
     }
 
     private function generateAuthMe()
     {
-        $content = <<<'PHP'
-<?php
-require_once __DIR__ . '/../config/helpers.php';
-require_once __DIR__ . '/../config/database.php';
-require_once __DIR__ . '/../middleware/auth.php';
-require_once __DIR__ . '/../models/User.php';
-
-$user_data = requireAuth();
-
-$database = new Database();
-$db = $database->getConnection();
-$user = new User($db);
-
-$userData = $user->getById($user_data['user_id']);
-
-if($userData) {
-    sendResponse(200, $userData);
-} else {
-    sendResponse(404, null, 'Utente non trovato');
-}
-
-PHP;
-        file_put_contents($this->outputPath . '/auth/me.php', $content);
+        $templatePath = dirname(__DIR__) . '/Builder/me.php';
+        copy($templatePath, $this->outputPath . '/auth/me.php');
     }
 
     // ===== HTACCESS =====
@@ -966,13 +663,52 @@ PHP;
         file_put_contents($this->outputPath . '/index.php', $indexRouter);
     }
 
-    // ===== DOCUMENTAZIONE =====
 
-    private function generateDocumentation($config)
+
+    // ===== UTILITY =====
+    private function getEnabledTables($currentDbConfig)
     {
-        $this->generateReadme($config);
+        return array_filter($currentDbConfig, function ($table, $key) {
+            return $key !== '_views'
+                && substr($key, 0, 6) !== '_view_'
+                && isset($table['enabled'])
+                && $table['enabled'] === true;
+        }, ARRAY_FILTER_USE_BOTH);
     }
 
+    private function getTableColumns($tableName)
+    {
+        $db = db();
+        $stmt = $db->query("DESCRIBE `{$tableName}`");
+        return $stmt->fetchAll();
+    }
+
+    private function getPrimaryKey($columns)
+    {
+        foreach ($columns as $column) {
+            if ($column['Key'] === 'PRI') {
+                return $column['Field'];
+            }
+        }
+        return 'id';
+    }
+
+    private function toCamelCase($string)
+    {
+        $str = str_replace(' ', '', ucwords(str_replace('-', ' ', $string)));
+        return $str;
+    }
+
+    private function loadConfig()
+    {
+        if (file_exists($this->configFile)) {
+            return json_decode(file_get_contents($this->configFile), true) ?? [];
+        }
+        return [];
+    }
+
+
+    // ===== DOCUMENTAZIONE =====
     private function generateReadme($config)
     {
         $currentDbConfig = $config[getDatabaseName()] ?? [];
@@ -985,7 +721,7 @@ PHP;
         $content .= "📅 **Generato il:** " . date('d/m/Y H:i:s') . "\n";
         $content .= "📊 **Tabelle abilitate:** " . count($enabledTables) . "\n";
         $content .= "👁️ **Viste personalizzate:** {$viewsCount}\n\n";
-        
+
         $content .= "---\n\n";
         $content .= "## 📋 Indice\n\n";
         $content .= "1. [Deployment](#-deployment)\n";
@@ -996,7 +732,7 @@ PHP;
         $content .= "6. [Sicurezza e Rate Limiting](#-sicurezza-e-rate-limiting)\n";
         $content .= "7. [Gestione Errori](#-gestione-errori)\n";
         $content .= "8. [Esempi di Utilizzo](#-esempi-di-utilizzo)\n\n";
-        
+
         $content .= "---\n\n";
         $content .= "## 🚀 Deployment\n\n";
         $content .= "### Requisiti\n";
@@ -1024,7 +760,7 @@ PHP;
         $content .= "   ```bash\n";
         $content .= "   curl https://tuodominio.com/api/\n";
         $content .= "   ```\n\n";
-        
+
         $content .= "---\n\n";
         $content .= "## 📁 Struttura del Progetto\n\n";
         $content .= "```\n";
@@ -1047,7 +783,7 @@ PHP;
         $content .= "    ├── login.php          # Endpoint login\n";
         $content .= "    └── me.php             # Endpoint info utente\n";
         $content .= "```\n\n";
-        
+
         $content .= "---\n\n";
         $content .= "## ⚙️ Configurazione\n\n";
         $content .= "### Database\n";
@@ -1061,7 +797,7 @@ PHP;
         $content .= "```php\n";
         $content .= "header('Access-Control-Allow-Origin: https://tuodominio.com');\n";
         $content .= "```\n\n";
-        
+
         $content .= "---\n\n";
         $content .= "## 📡 Endpoint Disponibili\n\n";
         $content .= "### Base URL\n";
@@ -1073,7 +809,7 @@ PHP;
             $authRequired = isset($tableConfig['require_auth']) && $tableConfig['require_auth'] ? '🔒' : '🔓';
             $rateLimit = $tableConfig['rate_limit'] ?? 100;
             $rateLimitWindow = $tableConfig['rate_limit_window'] ?? 60;
-            
+
             $content .= "### {$authRequired} {$tableName}\n\n";
             $content .= "**Rate Limit:** {$rateLimit} richieste ogni {$rateLimitWindow} secondi\n\n";
             $content .= "| Metodo | Endpoint | Descrizione | Auth |\n";
@@ -1095,7 +831,7 @@ PHP;
                 $content .= "**Query SQL:**\n```sql\n" . ($viewConfig['query'] ?? '') . "\n```\n\n";
             }
         }
-        
+
         $content .= "---\n\n";
         $content .= "## 🔐 Autenticazione\n\n";
         $content .= "L'API utilizza **JWT (JSON Web Tokens)** per l'autenticazione.\n\n";
@@ -1148,7 +884,7 @@ PHP;
         $content .= "}\n";
         $content .= "```\n\n";
         $content .= "⏱️ **Validità token:** 24 ore\n\n";
-        
+
         $content .= "---\n\n";
         $content .= "## 🛡️ Sicurezza e Rate Limiting\n\n";
         $content .= "### Rate Limiting\n";
@@ -1169,7 +905,7 @@ PHP;
         $content .= "- ✅ Rate Limiting\n";
         $content .= "- ✅ JWT con scadenza\n";
         $content .= "- ✅ Password hash (bcrypt)\n\n";
-        
+
         $content .= "---\n\n";
         $content .= "## ⚠️ Gestione Errori\n\n";
         $content .= "Tutte le risposte seguono un formato standard:\n\n";
@@ -1200,7 +936,7 @@ PHP;
         $content .= "| 404 | Non trovato |\n";
         $content .= "| 429 | Troppe richieste (rate limit) |\n";
         $content .= "| 500 | Errore server |\n\n";
-        
+
         $content .= "---\n\n";
         $content .= "## 💻 Esempi di Utilizzo\n\n";
         $content .= "### JavaScript / Fetch API\n\n";
@@ -1276,7 +1012,7 @@ PHP;
         $content .= "curl_setopt(\$ch, CURLOPT_RETURNTRANSFER, true);\n";
         $content .= "\$response = curl_exec(\$ch);\n";
         $content .= "```\n\n";
-        
+
         $content .= "---\n\n";
         $content .= "## 📞 Supporto\n\n";
         $content .= "Per problemi o domande:\n";
@@ -1284,52 +1020,10 @@ PHP;
         $content .= "- Controlla le credenziali database in `config/database.php`\n";
         $content .= "- Assicurati che mod_rewrite sia attivo\n";
         $content .= "- Verifica i permessi delle cartelle (755 per directory, 644 per file)\n\n";
-        
+
         $content .= "---\n\n";
         $content .= "**🎉 API generata con successo!**\n";
 
         file_put_contents($this->outputPath . '/README.md', $content);
-    }
-
-    // ===== UTILITY =====
-
-    private function getEnabledTables($currentDbConfig)
-    {
-        return array_filter($currentDbConfig, function ($table, $key) {
-            return $key !== '_views'
-                && substr($key, 0, 6) !== '_view_'
-                && isset($table['enabled'])
-                && $table['enabled'] === true;
-        }, ARRAY_FILTER_USE_BOTH);
-    }
-
-    private function getTableColumns($tableName)
-    {
-        $db = db();
-        $stmt = $db->query("DESCRIBE `{$tableName}`");
-        return $stmt->fetchAll();
-    }
-
-    private function getPrimaryKey($columns)
-    {
-        foreach ($columns as $column) {
-            if ($column['Key'] === 'PRI') {
-                return $column['Field'];
-            }
-        }
-        return 'id';
-    }
-
-    private function toCamelCase($string)
-    {
-        return str_replace(' ', '', ucwords(str_replace('_', ' ', $string)));
-    }
-
-    private function loadConfig()
-    {
-        if (file_exists($this->configFile)) {
-            return json_decode(file_get_contents($this->configFile), true) ?? [];
-        }
-        return [];
     }
 }

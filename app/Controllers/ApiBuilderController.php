@@ -590,8 +590,11 @@ RewriteEngine On
 RewriteCond %{REQUEST_METHOD} OPTIONS
 RewriteRule ^(.*)$ $1 [R=200,L]
 
-# Route /api/auth/* to endpoints/auth.php
-RewriteRule ^api/auth/(.*)$ endpoints/auth.php [QSA,L]
+# Route /api/auth/login to endpoints/auth.php
+RewriteRule ^api/auth/login/?$ endpoints/auth.php [QSA,L]
+
+# Route /api/auth/me to auth/me.php
+RewriteRule ^api/auth/me/?$ auth/me.php [QSA,L]
 
 # Route /api/{table} to endpoints/{table}.php
 RewriteRule ^api/([^/]+)/?$ endpoints/$1.php [QSA,L]
@@ -628,9 +631,15 @@ $request_method = $_SERVER['REQUEST_METHOD'];
 // Rimuovi query string
 $path = parse_url($request_uri, PHP_URL_PATH);
 
-// Route /api/auth/* to endpoints/auth.php
-if (preg_match('#^/api/auth/(.*)#', $path, $matches)) {
+// Route /api/auth/login
+if (preg_match('#^/api/auth/login/?$#', $path)) {
     require __DIR__ . '/endpoints/auth.php';
+    exit;
+}
+
+// Route /api/auth/me
+if (preg_match('#^/api/auth/me/?$#', $path)) {
+    require __DIR__ . '/auth/me.php';
     exit;
 }
 

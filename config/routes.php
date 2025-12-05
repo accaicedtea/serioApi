@@ -1,5 +1,5 @@
 <?php
-use Core\Database;
+
 // Controlla se la route corrente richiede una connessione al database
 $currentPath = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 $databaseRoutes = ['/database', '/generator', '/deploy'];
@@ -25,8 +25,6 @@ $routes = [
         'action' => 'index',
         'method' => 'GET'
     ],
-    
-    
     // Database routes
     '/database' => [
         'controller' => 'DatabaseController',
@@ -135,6 +133,12 @@ $routes = [
         'action' => 'testConnection',
         'method' => 'POST'
     ],
+    // '/nuovo/esempio' => [
+    //     'controller' => 'NuovoController',
+    //     'action' => 'index',
+    //     'method' => 'GET'
+    // ],
+
     
 ];
 

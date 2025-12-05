@@ -92,9 +92,21 @@ class ApiBuilderController extends Controller
             $this->outputPath . '/models',
             $this->outputPath . '/endpoints',
             $this->outputPath . '/auth',
-            $this->outputPath . '/storage',
-            $this->outputPath . '/storage/cache'
         ];
+        // Esempio: per cambiare la variabile
+        /* 
+            $dirs = [
+            $this->outputPath,
+            $this->outputPath . '/config',
+            $this->outputPath . '/middleware',
+            $this->outputPath . '/models',
+            $this->outputPath . '/endpoints',
+            $this->outputPath . '/auth',
+            $this->outputPath - '/storage', // aggiunta 
+            $this->outputPath - '/storage/cache', // aggiunta
+            
+        ];
+        */
 
         foreach ($dirs as $dir) {
             if (!is_dir($dir)) {
@@ -107,67 +119,26 @@ class ApiBuilderController extends Controller
 
     private function generateConfigFiles()
     {
-        // 1. database.php - usa i dati dall'ENV
+        // database.php - usa i dati dall'ENV
         $this->generateDatabaseConfig();
 
-        // 2. jwt.php - usa JWT_SECRET dall'ENV
+        // jwt.php - usa JWT_SECRET dall'ENV
         $this->generateJwtConfig();
 
-        // 3. cache.php - usa variabili ENV per abilitazione/TTL/dir
-        $this->generateCacheConfig();
-
-        // 3. helpers.php - funzioni globali unificate
+        // helpers.php - funzioni globali unificate
         $this->generateHelpersFile();
 
-        // 4. cors.php - CORS headers standalone
+        // cors.php - CORS headers standalone
         $this->generateCorsFile();
 
-        // 5. api_config.json
+        // api_config.json
         copy($this->configFile, $this->outputPath . '/config/api_config.json');
 
-        // 6. .htaccess per proteggere config
+        // htaccess per proteggere config
         file_put_contents($this->outputPath . '/config/.htaccess', "Deny from all\n");
     }
 
-    // ===== CACHE CONFIG =====
-    private function generateCacheConfig()
-    {
-        $templatePath = dirname(__DIR__) . '/Builder/Cache.php';
-        $outDir = $this->outputPath . '/config';
-        $outFile = $outDir . '/cache.php';
-
-        if (!is_dir($outDir)) {
-            mkdir($outDir, 0775, true);
-        }
-
-        if (!is_file($templatePath)) {
-            throw new \RuntimeException("Template Cache non trovato: {$templatePath}");
-        }
-
-        $tpl = file_get_contents($templatePath);
-
-        $vars = [
-            '__CACHE_ENABLED__' => env('CACHE_ENABLED', true) ? 'true' : 'false',
-            '__CACHE_TTL__' => (string) env('CACHE_TTL', 300),
-            '__CACHE_DIR__' => "'" . $this->outputPath . "/storage/cache'",
-        ];
-
-        // Se mancano i placeholder, prova a sostituire i pattern comuni
-        if (strpos($tpl, '__CACHE_ENABLED__') === false) {
-            $tpl = preg_replace('/(private\s+\$enabled\s*=\s*)(true|false)/', '$1__CACHE_ENABLED__', $tpl);
-        }
-        if (strpos($tpl, '__CACHE_TTL__') === false) {
-            $tpl = preg_replace('/(private\s+\$ttl\s*=\s*)\d+/', '$1__CACHE_TTL__', $tpl);
-        }
-        if (strpos($tpl, '__CACHE_DIR__') === false) {
-            $tpl = preg_replace('/(private\s+\$dir\s*=\s*)([^
-;]+)/', '$1__CACHE_DIR__', $tpl);
-        }
-
-        $rendered = strtr($tpl, $vars);
-        file_put_contents($outFile, $rendered);
-    }
-
+    
     private function generateDatabaseConfig()
     {
         require_once __DIR__ . '/../../config/database.php';

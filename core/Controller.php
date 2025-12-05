@@ -6,7 +6,7 @@ class Controller {
         // Aggiungi automaticamente il CSRF token a tutte le viste
         $data['csrf_token'] = Security::csrfToken();
         
-        // Aggiungi Stile personalizzato
+        // Aggiungi Stile personalizzato (o in un file specifico oppure direttamente nelle virgolette)
         $data['style'] = '';
 
         extract($data);
@@ -32,7 +32,6 @@ class Controller {
         
         // Chiudi wrapper
         echo '</div>';
-
 
         // Include Footer
         if (file_exists(__DIR__ . '/../app/Views/components/Footer.php')) {

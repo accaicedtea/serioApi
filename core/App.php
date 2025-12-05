@@ -15,9 +15,12 @@ class App {
 
         $controllerFile = __DIR__ . '/../app/Controllers/' . $this->controller . '.php';
         if (file_exists($controllerFile)) {
+            
             require_once $controllerFile;
+            
             $controllerClass = '\App\Controllers\\' . $this->controller;
             $controller = new $controllerClass();
+            
             if (method_exists($controller, $this->method)) {
                 call_user_func_array([$controller, $this->method], $this->params);
             } else {

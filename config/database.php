@@ -1,13 +1,14 @@
 <?php
 
-// Load helper functions (includes loadEnv)
+// Carica le funzioni (per loadEnv)
 require_once __DIR__ . '/../core/helpers.php';
 
-// Load environment variables
+// Carica le variabili d'ambiente
 loadEnv();
 
 // Funzione per ottenere la configurazione del database
 function getDatabaseConfig($environment = null) {
+    
     // Se non viene passato un environment, usa quello dall'ENV
     if ($environment === null) {
         $environment = env('ENVIRONMENT', 'development');
@@ -30,6 +31,14 @@ function getDatabaseConfig($environment = null) {
             'pass' =>  '',
             'charset' => 'utf8mb4',
         ],
+        // 'example' => [
+        //     'dbType' => 'MySQL',
+        //     'host' => 'localhost',
+        //     'dbname' => 'example_db',
+        //     'user' => 'example_user',
+        //     'pass' => 'example_pass',
+        //     'charset' => 'utf8mb4',
+        // ]
     ];
     
     return $databases[$environment] ?? $databases['development'];

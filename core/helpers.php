@@ -1,11 +1,9 @@
 <?php
-// Helper functions
+// Funzioni di utilità per il progetto (da importare in ogni file che ne ha bisogno)
 
 use Core\Database;
 
-/**
- * Carica variabili d'ambiente dal file .env
- */
+// Carica variabili d'ambiente dal file .env
 function loadEnv(?string $path = null): void {
     static $loaded = false;
     
@@ -21,18 +19,17 @@ function loadEnv(?string $path = null): void {
     
     $lines = file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
     foreach ($lines as $line) {
-        // Skip comments
+        // Ignora commenti
         if (strpos(trim($line), '#') === 0) {
             continue;
         }
-        
-        // Parse key=value
+        // Rimuovi spazi bianchi e separa chiave e valore
         $parts = explode('=', $line, 2);
         if (count($parts) === 2) {
             $key = trim($parts[0]);
             $value = trim($parts[1]);
             
-            // Remove inline comments
+            // Rimuovi commenti inline
             if (strpos($value, '#') !== false) {
                 $value = trim(explode('#', $value)[0]);
             }
@@ -45,32 +42,24 @@ function loadEnv(?string $path = null): void {
     $loaded = true;
 }
 
-/**
- * Ottiene una variabile d'ambiente
- */
+// Ottiene una variabile d'ambiente
 function env(string $key, $default = null) {
     loadEnv();
     return $_ENV[$key] ?? getenv($key) ?: $default;
 }
 
-/**
- * Escape output per prevenire XSS
- */
+// Escape output per prevenire XSS
 function e($value) {
     return htmlspecialchars($value ?? '', ENT_QUOTES, 'UTF-8');
 }
 
-/**
- * Shortcut per echo + escape
- */
+// Shortcut per echo + escape
 function ee($value) {
     echo e($value);
 }
 
-/**
- * Ottiene una connessione al database
- * Helper per evitare di ripetere sempre new Database()->getConnection()
- */
+// Ottiene una connessione al database
+// Helper per evitare di ripetere sempre new Database()->getConnection()
 function db(): PDO {
     static $connection = null;
     
@@ -82,18 +71,14 @@ function db(): PDO {
     return $connection;
 }
 
-/**
- * Ottiene il nome del database corrente dalla configurazione
- */
+// Ottiene il nome del database corrente dalla configurazione
 function getDatabaseName(): string {
     require_once __DIR__ . '/../config/database.php';
     $dbConfig = getDatabaseConfig();
     return $dbConfig['dbname'] ?? 'unknown';
 }
 
-/**
- * Carica la configurazione API
- */
+// Carica la configurazione API
 function loadApiConfig(): array {
     $apiConfigPath = __DIR__ . '/../config/api_config.json';
     
@@ -104,9 +89,7 @@ function loadApiConfig(): array {
     return json_decode(file_get_contents($apiConfigPath), true) ?? [];
 }
 
-/**
- * Salva la configurazione API
- */
+// Salva la configurazione API
 function saveApiConfig(array $config): bool {
     $apiConfigPath = __DIR__ . '/../config/api_config.json';
     return file_put_contents(
@@ -115,9 +98,7 @@ function saveApiConfig(array $config): bool {
     ) !== false;
 }
 
-/**
- * Genera la struttura completa del database in JSON
- */
+// Genera la struttura completa del database in JSON
 function generateDatabaseStructure($db, $tables): void {
     try {
         $databaseName = getDatabaseName();

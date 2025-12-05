@@ -2,8 +2,6 @@
 namespace App\Controllers;
 
 use Core\Controller;
-use Core\Security;
-use Core\Database;
 use Exception;
 
 class HomeController extends Controller {

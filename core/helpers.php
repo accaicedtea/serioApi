@@ -1,5 +1,4 @@
 <?php
-// Funzioni di utilità per il progetto (da importare in ogni file che ne ha bisogno)
 
 use Core\Database;
 
@@ -138,3 +137,5 @@ function generateDatabaseStructure($db, $tables): void {
         error_log("Failed to update database structure: " . $e->getMessage());
     }
 }
+
+// Aggiungi qui le funzioni che ti servono per il progetto 

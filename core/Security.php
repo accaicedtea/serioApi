@@ -1,6 +1,6 @@
 <?php
 namespace Core;
-
+// TODO: Implementare requireAuth e validateToken
 class Security {
     private static $rateLimits = [];
     

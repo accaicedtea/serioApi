@@ -181,142 +181,142 @@ class Database {
 }
 ?>
 PHP;
-file_put_contents($this->outputPath . '/config/database.php', $content);
-}
-// ===== JWT CONFIG =====
-private function generateJwtConfig()
-{
-// Template JWT di riferimento (app/Builder/JWT.php)
-$templatePath = dirname(__DIR__) . '/Builder/JWT.php';
-$outDir = $this->outputPath . '/config';
-$outFile = $outDir . '/jwt.php';
+        file_put_contents($this->outputPath . '/config/database.php', $content);
+    }
+    // ===== JWT CONFIG =====
+    private function generateJwtConfig()
+    {
+        // Template JWT di riferimento (app/Builder/JWT.php)
+        $templatePath = dirname(__DIR__) . '/Builder/JWT.php';
+        $outDir = $this->outputPath . '/config';
+        $outFile = $outDir . '/jwt.php';
 
-if (!is_file($templatePath)) {
-throw new \RuntimeException("Template JWT non trovato: {$templatePath}");
-}
-if (!is_dir($outDir)) {
-mkdir($outDir, 0775, true);
-}
+        if (!is_file($templatePath)) {
+            throw new \RuntimeException("Template JWT non trovato: {$templatePath}");
+        }
+        if (!is_dir($outDir)) {
+            mkdir($outDir, 0775, true);
+        }
 
-// Valori da .env con default
-$vars = [
-'__JWT_SECRET__' => env('JWT_SECRET'),
-'__JWT_ALGO__' => env('JWT_ALGO', 'HS256'),
-'__JWT_TTL__' => (string) env('JWT_EXPIRES_IN'), // in secondi (24h)
-];
+        // Valori da .env con default
+        $vars = [
+            '__JWT_SECRET__' => env('JWT_SECRET'),
+            '__JWT_ALGO__' => env('JWT_ALGO', 'HS256'),
+            '__JWT_TTL__' => (string) env('JWT_EXPIRES_IN'), // in secondi (24h)
+        ];
 
-// Carica template
-$tpl = file_get_contents($templatePath);
+        // Carica template
+        $tpl = file_get_contents($templatePath);
 
-// Se il template non ha i placeholder standard, sostituisci i pattern comuni
-if (strpos($tpl, '__JWT_SECRET__') === false || strpos($tpl, '__JWT_ALGO__') === false || strpos($tpl, '__JWT_TTL__')
-=== false) {
-$tpl = preg_replace(
-[
-'/(private\s+\$secret_key\s*=\s*[\'"]).*?([\'"];)/',
-'/(private\s+\$algorithm\s*=\s*[\'"]).*?([\'"];)/',
-'/(private\s+\$ttl\s*=\s*)\d+(\s*;)/',
-],
-[
-'$1__JWT_SECRET__$2',
-'$1__JWT_ALGO__$2',
-'$1__JWT_TTL__$2',
-],
-$tpl
-);
-}
+        // Se il template non ha i placeholder standard, sostituisci i pattern comuni
+        if (strpos($tpl, '__JWT_SECRET__') === false || strpos($tpl, '__JWT_ALGO__') === false || strpos($tpl, '__JWT_TTL__') === false) {
+            $tpl = preg_replace(
+                [
+                    '/(private\s+\$secret_key\s*=\s*[\'"]).*?([\'"];)/',
+                    '/(private\s+\$algorithm\s*=\s*[\'"]).*?([\'"];)/',
+                    '/(private\s+\$ttl\s*=\s*)\d+(\s*;)/',
+                ],
+                [
+                    '$1__JWT_SECRET__$2',
+                    '$1__JWT_ALGO__$2',
+                    '$1__JWT_TTL__$2',
+                ],
+                $tpl
+            );
+        }
 
-// Applica le sostituzioni
-$rendered = strtr($tpl, $vars);
+        // Applica le sostituzioni
+        $rendered = strtr($tpl, $vars);
 
-file_put_contents($outFile, $rendered);
-}
+        file_put_contents($outFile, $rendered);
+    }
 
-// ===== HELPERS CONFIG =====
-private function generateHelpersFile()
-{
-// Copia il file helpers.php dal Builder
-$templatePath = dirname(__DIR__) . '/Builder/helpers.php';
-copy($templatePath, $this->outputPath . '/config/helpers.php');
-}
+    // ===== HELPERS CONFIG =====
+    private function generateHelpersFile()
+    {
+        // Copia il file helpers.php dal Builder
+        $templatePath = dirname(__DIR__) . '/Builder/helpers.php';
+        copy($templatePath, $this->outputPath . '/config/helpers.php');
+    }
 
-private function generateCorsFile()
-{
-$templatePath = dirname(__DIR__) . '/Builder/cors.php';
-copy($templatePath, $this->outputPath . '/cors.php');
-}
+    private function generateCorsFile()
+    {
+        $templatePath = dirname(__DIR__) . '/Builder/cors.php';
+        copy($templatePath, $this->outputPath . '/cors.php');
+    }
 
-// ===== MIDDLEWARE =====
+    // ===== MIDDLEWARE =====
 
-private function generateMiddleware()
-{
-// 1. auth.php
-$this->generateAuthMiddleware();
+    private function generateMiddleware()
+    {
+        // 1. auth.php
+        $this->generateAuthMiddleware();
 
-// 2. security.php (basico)
-$this->generateSecurityMiddleware();
+        // 2. security.php (basico)
+        $this->generateSecurityMiddleware();
 
-// 3. security_helper.php
-$this->generateSecurityHelper();
-}
+        // 3. security_helper.php
+        $this->generateSecurityHelper();
+    }
 
-private function generateAuthMiddleware()
-{
-$templatePath = dirname(__DIR__) . '/Builder/auth.php';
-copy($templatePath, $this->outputPath . '/middleware/auth.php');
-}
+    private function generateAuthMiddleware()
+    {
+        $templatePath = dirname(__DIR__) . '/Builder/auth.php';
+        copy($templatePath, $this->outputPath . '/middleware/auth.php');
+    }
 
-private function generateSecurityMiddleware()
-{
-$templatePath = dirname(__DIR__) . '/Builder/security.php';
-copy($templatePath, $this->outputPath . '/middleware/security.php');
-}
+    private function generateSecurityMiddleware()
+    {
+        $templatePath = dirname(__DIR__) . '/Builder/security.php';
+        copy($templatePath, $this->outputPath . '/middleware/security.php');
+    }
 
-private function generateSecurityHelper()
-{
-$templatePath = dirname(__DIR__) . '/Builder/security_helper.php';
-copy($templatePath, $this->outputPath . '/middleware/security_helper.php');
-}
+    private function generateSecurityHelper()
+    {
+        $templatePath = dirname(__DIR__) . '/Builder/security_helper.php';
+        copy($templatePath, $this->outputPath . '/middleware/security_helper.php');
+    }
 
-// ===== GENERAZIONE TABELLE =====
-private function generateTablesApi($currentDbConfig)
-{
-foreach ($currentDbConfig as $tableName => $tableConfig) {
-// Salta _views
-if ($tableName === '_views' || substr($tableName, 0, 6) === '_view_') {
-continue;
-}
+    // ===== GENERAZIONE TABELLE =====
+    private function generateTablesApi($currentDbConfig)
+    {
+        foreach ($currentDbConfig as $tableName => $tableConfig) {
+            // Salta _views
+            if ($tableName === '_views' || substr($tableName, 0, 6) === '_view_') {
+                continue;
+            }
 
-if (isset($tableConfig['enabled']) && $tableConfig['enabled'] === true) {
-$columns = $this->getTableColumns($tableName);
-$this->generateModel($tableName, $columns);
-$this->generateEndpoint($tableName, $tableConfig, $columns);
-}
-}
-}
+            if (isset($tableConfig['enabled']) && $tableConfig['enabled'] === true) {
+                $columns = $this->getTableColumns($tableName);
+                $this->generateModel($tableName, $columns);
+                $this->generateEndpoint($tableName, $tableConfig, $columns);
+            }
+        }
+    }
 
-private function generateModel($tableName, $columns)
-{
-$className = $this->toCamelCase($tableName);
-$primaryKey = $this->getPrimaryKey($columns);
+    private function generateModel($tableName, $columns)
+    {
+        $className = $this->toCamelCase($tableName);
+        $primaryKey = $this->getPrimaryKey($columns);
 
-// Genera campi per INSERT/UPDATE
-$fields = [];
-foreach ($columns as $column) {
-if ($column['Field'] !== $primaryKey && $column['Extra'] !== 'auto_increment') {
-$fields[] = $column['Field'];
-}
-}
+        // Genera campi per INSERT/UPDATE
+        $fields = [];
+        foreach ($columns as $column) {
+            if ($column['Field'] !== $primaryKey && $column['Extra'] !== 'auto_increment') {
+                $fields[] = $column['Field'];
+            }
+        }
 
-$bindParams = '';
-$setParams = '';
-foreach ($fields as $field) {
-$bindParams .= " \$stmt->bindParam(\":{$field}\", \$data['{$field}']);\n";
-$setParams .= "{$field}=:{$field}, ";
-}
-$setParams = rtrim($setParams, ', ');
+        $bindParams = '';
+        $setParams = '';
+        foreach ($fields as $field) {
+            $bindParams .= "        \$stmt->bindParam(\":{$field}\", \$data['{$field}']);\n";
+            $setParams .= "{$field}=:{$field}, ";
+        }
+        $setParams = rtrim($setParams, ', ');
 
-$content = <<<PHP <?php
+        $content = <<<PHP
+<?php
 require_once __DIR__ . '/../config/database.php';
 
 class {$className} {

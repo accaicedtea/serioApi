@@ -6,20 +6,24 @@ use Core\Security;
 use Core\Database;
 
 class GeneratorController extends Controller {
-    public function index() {
-
-        $data = [
-            'title' => 'API Generator - Configurazione',
-            'tables' => [],
-            'config' => [],
-            'currentDatabase' => '',
-            'securityTables' => [],
-            'error' => null
-        ];
-        
-        try {
-            $db = db();
-            $tables = $db->query("SHOW TABLES")->fetchAll(\PDO::FETCH_COLUMN);
+    
+    private Database $db;
+    
+    public function __construct(Database $db) {
+        $this->db = $db;
+    }
+        public function index() {
+            //inizializza i dati della pagina
+            $data = [
+                'title' => 'API Generator - Configurazione',
+                'tables' => [],
+                'config' => [],
+                'currentDatabase' => '',
+                'securityTables' => [],
+                'error' => null
+            ];
+    
+            $tables = $this->db->getDatabaseTables();
             
             // Verifica se le tabelle di sicurezza esistono
             $securityTables = [
@@ -50,11 +54,7 @@ class GeneratorController extends Controller {
             $data['currentDatabase'] = $databaseName;
             $data['securityTables'] = $securityTables;
             
-        } catch (\PDOException $e) {
-            // Dati se errore
-            $data['title'] = 'Database ERROREE';
-            $data['error'] = $e->getMessage();
-        }
+       
         
         $this->view('generator/index', $data);
     }
@@ -70,11 +70,9 @@ class GeneratorController extends Controller {
         }
         
         try {
-            $database = new Database();
-            $db = $database->getConnection();
-            
+            $query = $this->db->getConnection();
             // Crea tabella user_auth
-            $db->exec("
+            $query->exec("
                 CREATE TABLE IF NOT EXISTS user_auth (
                     id INT AUTO_INCREMENT PRIMARY KEY,
                     email VARCHAR(191) NOT NULL UNIQUE,
@@ -93,14 +91,14 @@ class GeneratorController extends Controller {
             $adminPass = password_hash('admin123', PASSWORD_DEFAULT);
             $managerPass = password_hash('manager123', PASSWORD_DEFAULT);
             
-            $db->exec("
+            $query->exec("
                 INSERT IGNORE INTO user_auth (email, password, name, role, site_url) VALUES
                 ('admin@menucrud.com', '$adminPass', 'Amministratore', 'admin', 'http://test.org'),
                 ('manager@menucrud.com', '$managerPass', 'Manager', 'manager', 'http://test.org')
             ");
             
             // Crea tabella banned_ips
-            $db->exec("
+            $query->exec("
                 CREATE TABLE IF NOT EXISTS banned_ips (
                     id INT AUTO_INCREMENT PRIMARY KEY,
                     ip_address VARCHAR(45) NOT NULL,
@@ -113,7 +111,7 @@ class GeneratorController extends Controller {
             ");
             
             // Crea tabella rate_limits
-            $db->exec("
+            $query->exec("
                 CREATE TABLE IF NOT EXISTS rate_limits (
                     id INT AUTO_INCREMENT PRIMARY KEY,
                     ip_address VARCHAR(45) NOT NULL,
@@ -127,7 +125,7 @@ class GeneratorController extends Controller {
             ");
             
             // Crea tabella failed_attempts
-            $db->exec("
+            $query->exec("
                 CREATE TABLE IF NOT EXISTS failed_attempts (
                     id INT AUTO_INCREMENT PRIMARY KEY,
                     identifier VARCHAR(100) NOT NULL,
@@ -141,7 +139,7 @@ class GeneratorController extends Controller {
             ");
             
             // Crea tabella security_logs
-            $db->exec("
+            $query->exec("
                 CREATE TABLE IF NOT EXISTS security_logs (
                     id INT AUTO_INCREMENT PRIMARY KEY,
                     client_ip VARCHAR(45) NOT NULL,
@@ -176,41 +174,34 @@ class GeneratorController extends Controller {
             'error' => null
         ];
         
-        try {
-            $db = db();
-            
-            // Recupera tutte le tabelle del database
-            $tables = $db->query("SHOW TABLES")->fetchAll(\PDO::FETCH_COLUMN);
-            
-            // Carica la configurazione esistente delle viste
-            $config = loadApiConfig();
-            
-            // Ottieni il nome del database corrente
-            $databaseName = getDatabaseName();
-            
-            // Recupera le viste del database corrente
-            $viewsConfig = [];
-            if (isset($config[$databaseName]['_views'])) {
-                $viewsConfig = $config[$databaseName]['_views'];
-            }
-            
-            // Recupera gli stati enabled delle viste
-            $viewsEnabled = [];
-            foreach ($viewsConfig as $viewName => $viewData) {
-                $viewsEnabled[$viewName] = $config[$databaseName]['_view_' . $viewName]['enabled'] ?? false;
-            }
-            
-            // Dati se funziona
-            $data['viewsConfig']=$viewsConfig;
-            $data['viewsEnabled'] = $viewsEnabled;
-            $data['currentDatabase'] = $databaseName;
-            $data['tables'] = $tables;
-            
-        } catch (\PDOException $e) {
-            // Dati se errore
-            $data['title'] = 'Database Error';
-            $data['error'] = $e->getMessage();
+        // Recupera tutte le tabelle del database
+        $tables = $this->db->getDatabaseTables();
+        
+        // Ottieni il nome del database corrente
+        $databaseName = $this->db->getDatabaseName();
+        
+        // Carica la configurazione esistente delle viste
+        $config = loadApiConfig();
+        
+        // Recupera le viste del database corrente
+        $viewsConfig = [];
+        if (isset($config[$databaseName]['_views'])) {
+            $viewsConfig = $config[$databaseName]['_views'];
         }
+        
+        // Recupera gli stati enabled delle viste
+        $viewsEnabled = [];
+        foreach ($viewsConfig as $viewName => $viewData) {
+            $viewsEnabled[$viewName] = $config[$databaseName]['_view_' . $viewName]['enabled'] ?? false;
+        }
+        
+        // Dati se funziona
+        $data['viewsConfig']=$viewsConfig;
+        $data['viewsEnabled'] = $viewsEnabled;
+        $data['currentDatabase'] = $databaseName;
+        $data['tables'] = $tables;
+        
+        
         $this->view('generator/views', $data);
     }
     
@@ -225,14 +216,14 @@ class GeneratorController extends Controller {
         }
         
         try {
-            $db = db();
+            $db = $this->db;
             $query = $_POST['query'] ?? '';
             
             if (stripos($query, 'SELECT') !== 0) {
                 throw new \Exception('Solo query SELECT sono permesse');
             }
             
-            $result = $db->query($query)->fetchAll();
+            $result = $db->getConnection()->query($query)->fetchAll();
             
             echo json_encode([
                 'success' => true,
@@ -425,7 +416,7 @@ class GeneratorController extends Controller {
         
         saveApiConfig($newConfig);
         
-        header('Location: /generator?saved=1');
+        header('Location: /generator?saved=101');
         exit;
     }
 }

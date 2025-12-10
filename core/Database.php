@@ -3,7 +3,10 @@ namespace Core;
 
 class Database {
     private $pdo = null;
-
+    private $dbName = null;
+    private $dbTables = [];
+    private $isConnected = false;
+    private $connectionType = 'Not connected';
     public function __construct() {
         if ($this->pdo === null) {
             require_once __DIR__ . '/../config/database.php';
@@ -31,6 +34,12 @@ class Database {
                 if (php_sapi_name() === 'cli') {
                     echo "[CORE: DB] Connessione avvenuta con successo\n";
                 }
+                // Inizializza variabili database
+                $this->dbName = $config['dbname'];
+                $this->dbTables = $this->pdo->query("SHOW TABLES")->fetchAll(\PDO::FETCH_COLUMN);
+                $this->isConnected = true;
+                $this->connectionType = 'MySQL';
+
             } catch (\PDOException $e) {
                 if (php_sapi_name() === 'cli') {
                     echo "[CORE: DB] Errore connessione: " . $e->getMessage() . "\n";
@@ -42,5 +51,43 @@ class Database {
 
     public function getConnection() {
         return $this->pdo;
+    }
+    public function getDatabaseName() {
+        return $this->dbName;
+    }
+    public function getDatabaseTables() {
+        return $this->dbTables;
+    }
+    public function isConnected() {
+        return $this->isConnected;
+    }
+    public function getConnectionType() {
+        return $this->connectionType;
+    }
+    // Restituisce la descrizione di una tabella
+    public function describeTable($tableName) {
+        $query = $this->pdo->prepare("DESCRIBE `$tableName`");
+        $query->execute();
+        return $query->fetchAll(\PDO::FETCH_ASSOC);
+    }
+
+    // Restituisce il numero di righe in una tabella
+    public function getTableRowCount($tableName) {
+        $stmt = $this->pdo->prepare("SELECT COUNT(*) as count FROM `$tableName`");
+        $stmt->execute();
+        $result = $stmt->fetch(\PDO::FETCH_ASSOC);
+        return $result ? (int)$result['count'] : 0;
+    }
+    
+
+    // Verifica se il database contiene le tabelle di sicurezza essenziali
+    public function hasSecurityTables(): bool {
+        $requiredTables = ['user_auth', 'banned_ips', 'rate_limits', 'failed_attempts', 'security_logs'];
+        foreach ($requiredTables as $table) {
+            if (!in_array($table, $this->dbTables)) {
+                return false;
+            }
+        }
+        return true;
     }
 }

@@ -57,26 +57,6 @@ function ee($value) {
     echo e($value);
 }
 
-// Ottiene una connessione al database
-// Helper per evitare di ripetere sempre new Database()->getConnection()
-function db(): PDO {
-    static $connection = null;
-    
-    if ($connection === null) {
-        $database = new Database();
-        $connection = $database->getConnection();
-    }
-    
-    return $connection;
-}
-
-// Ottiene il nome del database corrente dalla configurazione
-function getDatabaseName(): string {
-    require_once __DIR__ . '/../config/database.php';
-    $dbConfig = getDatabaseConfig();
-    return $dbConfig['dbname'] ?? 'unknown';
-}
-
 // Carica la configurazione API
 function loadApiConfig(): array {
     $apiConfigPath = __DIR__ . '/../config/api_config.json';
@@ -100,7 +80,7 @@ function saveApiConfig(array $config): bool {
 // Genera la struttura completa del database in JSON
 function generateDatabaseStructure($db, $tables): void {
     try {
-        $databaseName = getDatabaseName();
+        $databaseName = $db->getDatabaseName();
         $apiConfig = loadApiConfig();
         
         // Se il database non esiste ancora nel config, crealo

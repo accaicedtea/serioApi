@@ -2,7 +2,7 @@
 namespace Core;
 
 class Controller {
-    protected function view($view, $data = []) {
+    protected function view($view, $data = []) {       
         // Aggiungi automaticamente il CSRF token a tutte le viste
         $data['csrf_token'] = Security::csrfToken();
         

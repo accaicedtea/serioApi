@@ -2,7 +2,6 @@
 namespace App\Controllers;
 
 use Core\Controller;
-use Core\Security;
 // TODO: non funziona
 class FtpDeployController extends Controller {
     private $generatedApiPath = __DIR__ . '/../../generated-api';
@@ -23,20 +22,6 @@ class FtpDeployController extends Controller {
         
         $this->view('deploy/index', $data);
     }
-    
-    private function loadCredentials() {
-        return [
-            'ftp_host' => env('FTP_HOST'),
-            'ftp_port' => env('FTP_PORT'),
-            'ftp_user' => env('FTP_USERNAME'),
-            'ftp_pass' => env('FTP_PASSWORD'),
-            'ftp_path' => env('FTP_REMOTE_PATH'),
-            'ftp_ssl' => env('FTP_SSL'),
-        ];
-    }
-    
-
-    
     public function upload() {
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
             header('Location: /deploy');
@@ -187,4 +172,16 @@ class FtpDeployController extends Controller {
         
         return $count;
     }
+    
+    private function loadCredentials() {
+        return [
+            'ftp_host' => env('FTP_HOST'),
+            'ftp_port' => env('FTP_PORT'),
+            'ftp_user' => env('FTP_USERNAME'),
+            'ftp_pass' => env('FTP_PASSWORD'),
+            'ftp_path' => env('FTP_REMOTE_PATH'),
+            'ftp_ssl' => env('FTP_SSL'),
+        ];
+    }
+    
 }

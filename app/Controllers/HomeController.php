@@ -6,7 +6,8 @@ use Core\Database;
 use Exception;
 
 class HomeController extends Controller {
-    private Database $db;
+    private $db;
+    
     public function __construct(Database $db) {
         $this->db = $db;
     }
@@ -58,7 +59,8 @@ class HomeController extends Controller {
         $data = [
             'title' => $title,
             'databaseType' => $this->db->getConnectionType(),
-            'connectionStatus' => $this->db->isConnected() ? 'Connected' : 'Disconnected',
+            'connectionStatus' => $this->db->isConnected(),
+            'databaseName' => $this->db->getDatabaseName(),
             'tables' => $tables,
             'tableDetails' => $selectedTableDetails,
             'apiStatus' => $apiStatus ?? [],
@@ -73,7 +75,7 @@ class HomeController extends Controller {
     //Funzione che vede se una tabella ha api dal file config (/config/api_config.json)
     private function hasApi(string $tableName): bool {
         $config = loadApiConfig();
-        $databaseName = getDatabaseName();
+        $databaseName = $this->db->getDatabaseName();
         
         // Verifica se il database esiste e se la tabella ha enabled: true
         if (!$config || !isset($config[$databaseName][$tableName])) {

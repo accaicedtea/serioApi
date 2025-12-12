@@ -2,7 +2,6 @@
 namespace App\Controllers;
 
 use Core\Controller;
-use Core\Security;
 
 class ApiBuilderController extends Controller
 {
@@ -27,8 +26,10 @@ class ApiBuilderController extends Controller
 
         $data = [
             'title' => 'API Builder - Generatore',
-            'config' => $currentDbConfig,
+            'databaseType' => $this->db->getConnectionType(),
+            'connectionStatus' => $this->db->isConnected(),
             'databaseName' => $this->db->getDatabaseName(),
+            'config' => $currentDbConfig,
             'enabledCount' => count($enabledTables),
             'viewsCount' => $viewsCount,
             'outputPath' => $this->outputPath,
@@ -53,7 +54,7 @@ class ApiBuilderController extends Controller
             $currentDbConfig = $config[$this->db->getDatabaseName()] ?? [];
 
             if (empty($currentDbConfig)) {
-                throw new \Exception("Configurazione non trovata per il database: " . getDatabaseName());
+                throw new \Exception("Configurazione non trovata per il database: " . $this->db->getDatabaseName());
             }
 
             // Crea struttura cartelle
@@ -662,8 +663,7 @@ PHP;
 
     private function getTableColumns($tableName)
     {
-        $db = db();
-        $stmt = $db->query("DESCRIBE `{$tableName}`");
+        $stmt = $this->db->getConnection()->query("DESCRIBE `{$tableName}`");
         return $stmt->fetchAll();
     }
 
@@ -695,9 +695,9 @@ PHP;
     // ===== DOCUMENTAZIONE =====
     private function generateReadme($config)
     {
-        $currentDbConfig = $config[getDatabaseName()] ?? [];
+        $currentDbConfig = $config[$this->db->getDatabaseName()] ?? [];
         $enabledTables = $this->getEnabledTables($currentDbConfig);
-        $databaseName = getDatabaseName();
+        $databaseName = $this->db->getDatabaseName();
         $viewsCount = isset($currentDbConfig['_views']) ? count($currentDbConfig['_views']) : 0;
 
         $content = "# API REST - {$databaseName}\n\n";

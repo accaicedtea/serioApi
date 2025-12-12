@@ -7,7 +7,7 @@ use Core\Database;
 
 class GeneratorController extends Controller {
     
-    private Database $db;
+    private $db;
     
     public function __construct(Database $db) {
         $this->db = $db;
@@ -16,29 +16,25 @@ class GeneratorController extends Controller {
             //inizializza i dati della pagina
             $data = [
                 'title' => 'API Generator - Configurazione',
+                'databaseType' => $this->db->getConnectionType(),
+                'connectionStatus' => $this->db->isConnected(),
+                'databaseName' => $this->db->getDatabaseName(),
                 'tables' => [],
                 'config' => [],
                 'currentDatabase' => '',
-                'securityTables' => [],
+                'securityTables' => false,
                 'error' => null
             ];
     
             $tables = $this->db->getDatabaseTables();
             
             // Verifica se le tabelle di sicurezza esistono
-            $securityTables = [
-                'user_auth' => in_array('user_auth', $tables),
-                'banned_ips' => in_array('banned_ips', $tables),
-                'rate_limits' => in_array('rate_limits', $tables),
-                'failed_attempts' => in_array('failed_attempts', $tables),
-                'security_logs' => in_array('security_logs', $tables)
-            ];
-
+            $securityTables = $this->db->hasSecurityTables();
             // Carica la configurazione esistente
             $config = loadApiConfig();
             
             // Ottieni il nome del database corrente
-            $databaseName = getDatabaseName();
+            $databaseName = $this->db->getDatabaseName();
             
             // Aggiungi le viste virtuali alla lista delle tabelle
             if (isset($config[$databaseName])) {
@@ -54,11 +50,54 @@ class GeneratorController extends Controller {
             $data['currentDatabase'] = $databaseName;
             $data['securityTables'] = $securityTables;
             
-       
-        
         $this->view('generator/index', $data);
     }
     
+public function views() {
+        $data = [
+            'title' => 'API Generator - Viste Personalizzate',
+            'databaseType' => $this->db->getConnectionType(),
+            'connectionStatus' => $this->db->isConnected(),
+            'databaseName' => $this->db->getDatabaseName(),
+            'viewsConfig' => [],
+            'viewsEnabled' => [],
+            'currentDatabase' => '',
+            'tables' => [],
+            'error' => null
+        ];
+        
+        // Recupera tutte le tabelle del database
+        $tables = $this->db->getDatabaseTables();
+        
+        // Ottieni il nome del database corrente
+        $databaseName = $this->db->getDatabaseName();
+        
+        // Carica la configurazione esistente delle viste
+        $config = loadApiConfig();
+        
+        // Recupera le viste del database corrente
+        $viewsConfig = [];
+        if (isset($config[$databaseName]['_views'])) {
+            $viewsConfig = $config[$databaseName]['_views'];
+        }
+        
+        // Recupera gli stati enabled delle viste
+        $viewsEnabled = [];
+        foreach ($viewsConfig as $viewName => $viewData) {
+            $viewsEnabled[$viewName] = $config[$databaseName]['_view_' . $viewName]['enabled'] ?? false;
+        }
+        
+        // Dati se funziona
+        $data['viewsConfig']=$viewsConfig;
+        $data['viewsEnabled'] = $viewsEnabled;
+        $data['currentDatabase'] = $databaseName;
+        $data['tables'] = $tables;
+        
+        
+        $this->view('generator/views', $data);
+    }
+    
+
     public function createSecurityTables() {
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
             header('Location: /generator');
@@ -164,46 +203,6 @@ class GeneratorController extends Controller {
         }
     }
     
-    public function views() {
-        $data = [
-            'title' => 'API Generator - Viste Personalizzate',
-            'viewsConfig' => [],
-            'viewsEnabled' => [],
-            'currentDatabase' => '',
-            'tables' => [],
-            'error' => null
-        ];
-        
-        // Recupera tutte le tabelle del database
-        $tables = $this->db->getDatabaseTables();
-        
-        // Ottieni il nome del database corrente
-        $databaseName = $this->db->getDatabaseName();
-        
-        // Carica la configurazione esistente delle viste
-        $config = loadApiConfig();
-        
-        // Recupera le viste del database corrente
-        $viewsConfig = [];
-        if (isset($config[$databaseName]['_views'])) {
-            $viewsConfig = $config[$databaseName]['_views'];
-        }
-        
-        // Recupera gli stati enabled delle viste
-        $viewsEnabled = [];
-        foreach ($viewsConfig as $viewName => $viewData) {
-            $viewsEnabled[$viewName] = $config[$databaseName]['_view_' . $viewName]['enabled'] ?? false;
-        }
-        
-        // Dati se funziona
-        $data['viewsConfig']=$viewsConfig;
-        $data['viewsEnabled'] = $viewsEnabled;
-        $data['currentDatabase'] = $databaseName;
-        $data['tables'] = $tables;
-        
-        
-        $this->view('generator/views', $data);
-    }
     
     public function testView() {
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -312,7 +311,7 @@ class GeneratorController extends Controller {
         $config = loadApiConfig();
         
         // Ottieni il nome del database corrente
-        $databaseName = getDatabaseName();
+        $databaseName = $this->db->getDatabaseName();
         
         // Verifica che la vista esista
         if (!isset($config[$databaseName]['_views'][$viewName])) {
@@ -361,7 +360,7 @@ class GeneratorController extends Controller {
         $config = loadApiConfig();
         
         // Ottieni il nome del database corrente
-        $databaseName = getDatabaseName();
+        $databaseName = $this->db->getDatabaseName();
         
         // Rimuovi la vista dalla sezione _views del database corrente
         if (isset($config[$databaseName]['_views'][$viewName])) {
@@ -395,7 +394,7 @@ class GeneratorController extends Controller {
         $existingConfig = loadApiConfig();
         
         // Ottieni il nome del database corrente
-        $databaseName = getDatabaseName();
+        $databaseName = $this->db->getDatabaseName();
         
         // Preserva _views del database corrente e ricostruisci le tabelle virtuali
         if (isset($existingConfig[$databaseName]['_views'])) {

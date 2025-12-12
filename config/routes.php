@@ -6,16 +6,12 @@ $databaseRoutes = ['/database', '/generator', '/deploy'];
 
 foreach ($databaseRoutes as $route) {
     if (strpos($currentPath, $route) === 0) {
-        // Controlla se c'è connessione al database
-        try {
-            $db = db();
-        } catch (Exception $e) {
-            // Vai alla home se non c'è connessione
-            header('Location: /');
-            exit;
+        // Vai alla home se non c'è connessione
+        header('Location: /');
+        exit;
         }
         break;
-    }
+    
 }
 // Tutte le routes
 $routes = [
@@ -130,9 +126,16 @@ $routes = [
     
     '/deploy/test' => [
         'controller' => 'FtpDeployController',
-        'action' => 'testConnection',
+        'action' => 'test',
         'method' => 'POST'
     ],
+    
+    '/deploy/move' => [
+        'controller' => 'FtpDeployController',
+        'action' => 'move',
+        'method' => 'POST'
+    ],
+    
     // '/nuovo/esempio' => [
     //     'controller' => 'NuovoController',
     //     'action' => 'index',

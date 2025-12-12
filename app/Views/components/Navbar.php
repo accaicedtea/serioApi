@@ -53,10 +53,14 @@ $currentPath = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 $currentPath = rtrim($currentPath, '/');
 if (empty($currentPath)) $currentPath = '/';
 
-//TODO: da completare Verifica connessione database
-$dbConnected = false;
-$dbName = 'N/A';
+// Verifica connessione database (ricevuta dal controller)
+$dbConnected = $data['connectionStatus'] ?? false;
+$dbName = $data['databaseName'] ?? 'Unknown';
 
+// Se connectionStatus è una stringa, convertila in boolean
+if (is_string($dbConnected)) {
+    $dbConnected = ($dbConnected === 'Connected');
+}
 ?>
 
 <nav class="navbar navbar-expand-lg navbar-dark app-navbar bg-dark mb-4">

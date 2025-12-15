@@ -90,4 +90,15 @@ class Database {
         }
         return true;
     }
+
+    public function getSecurityTables(): array {
+        $requiredTables = ['user_auth', 'banned_ips', 'rate_limits', 'failed_attempts', 'security_logs'];
+        $existingTables = [];
+        foreach ($requiredTables as $table) {
+            if (in_array($table, $this->dbTables)) {
+                $existingTables[$table] = true;
+            }
+        }
+        return $existingTables;
+    }
 }

@@ -22,14 +22,15 @@ class GeneratorController extends Controller {
                 'tables' => [],
                 'config' => [],
                 'currentDatabase' => '',
-                'securityTables' => false,
+                'securityTables' => [],
+                'hasSecurityTables' => count($this->db->getSecurityTables()) === 5,
                 'error' => null
             ];
     
             $tables = $this->db->getDatabaseTables();
             
             // Verifica se le tabelle di sicurezza esistono
-            $securityTables = $this->db->hasSecurityTables();
+            $securityTables = $this->db->getSecurityTables();
             // Carica la configurazione esistente
             $config = loadApiConfig();
             

@@ -10,7 +10,7 @@ function loadEnv(?string $path = null): void {
         return;
     }
     
-    $envFile = $path ?? __DIR__ . '/../config/.env';
+    $envFile = $path ?? __DIR__ . '/../.env';
     
     if (!file_exists($envFile)) {
         return;

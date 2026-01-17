@@ -181,7 +181,7 @@
                     <div class="card h-100 shadow-sm <?= $isEnabled ? 'border-success' : '' ?>">
                         <div class="card-header bg-gradient d-flex justify-content-between align-items-center"
                             style="background: linear-gradient(135deg, <?= $isEnabled ? '#28a745 0%, #20c997 100%' : '#667eea 0%, #764ba2 100%' ?>);">
-                            <h5 class="text-white mb-0">
+                            <h5 class="">
                                 <i class="fas fa-eye"></i> <?= e($view['name']) ?>
                             </h5>
                             <div class="form-check form-switch mb-0">
@@ -236,14 +236,20 @@
                                 </span>
                             </div>
 
-                            <form method="POST" action="/generator/delete-view" class="d-inline">
-                                <input type="hidden" name="csrf_token" value="<?= e($csrf_token) ?>">
-                                <input type="hidden" name="view_name" value="<?= e($name) ?>">
-                                <button type="submit" class="btn btn-danger btn-sm w-100"
-                                    onclick="return confirm('Sei sicuro di voler eliminare questa vista?')">
-                                    <i class="fas fa-trash"></i> Elimina
+                            <div class="d-flex gap-2">
+                                <button type="button" class="btn btn-primary btn-sm flex-fill"
+                                    onclick="editView('<?= e($name) ?>')">
+                                    <i class="fas fa-edit"></i> Modifica
                                 </button>
-                            </form>
+                                <form method="POST" action="/generator/delete-view" class="flex-fill">
+                                    <input type="hidden" name="csrf_token" value="<?= e($csrf_token) ?>">
+                                    <input type="hidden" name="view_name" value="<?= e($name) ?>">
+                                    <button type="submit" class="btn btn-danger btn-sm w-100"
+                                        onclick="return confirm('Sei sicuro di voler eliminare questa vista?')">
+                                        <i class="fas fa-trash"></i> Elimina
+                                    </button>
+                                </form>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -432,5 +438,33 @@ function saveView() {
 
     document.body.appendChild(form);
     form.submit();
+}
+
+function editView(viewName) {
+    // Carica i dati della vista nel form
+    const viewsData = <?= json_encode($viewsConfig) ?>;
+    const view = viewsData[viewName];
+    
+    if (!view) {
+        alert('Vista non trovata');
+        return;
+    }
+    
+    // Popola i campi del form
+    document.getElementById('view_name').value = view.name || viewName;
+    document.getElementById('view_description').value = view.description || '';
+    document.getElementById('view_query').value = view.query || '';
+    document.getElementById('view_rate_limit').value = view.rate_limit || 100;
+    document.getElementById('view_rate_window').value = view.rate_limit_window || 60;
+    document.getElementById('view_max_results').value = view.max_results || 100;
+    document.getElementById('view_cache_ttl').value = view.cache_ttl || 300;
+    document.getElementById('view_require_auth').checked = view.require_auth || false;
+    document.getElementById('view_enable_cache').checked = view.enable_cache || false;
+    
+    // Scroll al form
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    
+    // Focus sul primo campo
+    document.getElementById('view_description').focus();
 }
 </script>

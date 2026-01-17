@@ -17,6 +17,7 @@ class JWTHandler {
             'email' => $user['email'] ?? '',
             'role' => $user['role'] ?? 'user',
             'name' => $user['name'] ?? '',
+            'azienda_id' => (int)($user['azienda_id'] ?? 0),
             'iat' => $now,
             'nbf' => $now,
             'exp' => $now + $this->ttl,

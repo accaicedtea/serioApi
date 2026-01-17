@@ -273,11 +273,20 @@ public function views() {
         $viewName = $viewData['name'];
         $config[$databaseName]['_views'][$viewName] = $viewData;
         
-        // Aggiungi anche la vista come tabella virtuale nel database corrente
+        // Aggiungi anche la vista come tabella virtuale nel database corrente con tutti i parametri
         $config[$databaseName]['_view_' . $viewName] = [
-            'enabled' => false,
+            'enabled' => true,
             'is_virtual' => true,
-            'view_name' => $viewName
+            'view_name' => $viewName,
+            'rate_limit' => $viewData['rate_limit'] ?? 100,
+            'rate_limit_window' => $viewData['rate_limit_window'] ?? 60,
+            'max_results' => $viewData['max_results'] ?? 100,
+            'enable_cache' => $viewData['enable_cache'] ?? false,
+            'cache_ttl' => $viewData['cache_ttl'] ?? 300,
+            'select' => 'all',  // Le viste sono sempre read-only
+            'insert' => 'none',
+            'update' => 'none',
+            'delete' => 'none'
         ];
         
         saveApiConfig($config);

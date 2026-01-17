@@ -241,7 +241,17 @@ run_api_tests() {
 
 # Wrapper per test remoti
 run_remote_tests() {
-    run_tests "https://accaicedtea.altervista.org/mymenu" "false"
+    # Leggi l'URL dal file .env se disponibile
+    BASE_URL="https://thisisnotmysite.altervista.org/mymenu"
+    if [ -f ".env" ]; then
+        API_URL=$(grep -E '^API_BASE_URL=' .env | cut -d'=' -f2 | tr -d ' ' | sed 's/#.*//')
+        REMOTE_PATH=$(grep -E '^FTP_REMOTE_PATH=' .env | cut -d'=' -f2 | tr -d ' ' | sed 's/#.*//')
+        if [ ! -z "$API_URL" ] && [ ! -z "$REMOTE_PATH" ]; then
+            BASE_URL="${API_URL}${REMOTE_PATH}"
+        fi
+    fi
+    echo "🌐 Test su: $BASE_URL"
+    run_tests "$BASE_URL" "false"
 }
 
 # Funzione per eseguire il deploy via FTP
@@ -256,9 +266,9 @@ run_deploy() {
     fi
 
     # Credenziali e configurazione FTP
-    FTP_HOST="ftp.accaicedtea.altervista.org"
-    FTP_USER="accaicedtea"
-    FTP_PASS="uthc8An48aA7"
+    FTP_HOST="ftp.thisisnotmysite.altervista.org"
+    FTP_USER="thisisnotmysite"
+    FTP_PASS="puT59Uqedtjd"
     FTP_PATH="/mymenu"
 
     # Verifica se lftp è installato
@@ -282,7 +292,7 @@ run_deploy() {
 
     if [ $? -eq 0 ]; then
         echo -e "${GREEN}✅ DEPLOY COMPLETATO CON SUCCESSO!${NC}"
-        echo "   La tua API è live su: https://accaicedtea.altervista.org/mymenu/api/allergens"
+        echo "   La tua API è live su: https://thisisnotmysite.altervista.org/mymenu/api/allergens"
     else
         echo -e "${RED}❌ Errore durante il deploy! Controlla l'output e le credenziali.${NC}"
     fi

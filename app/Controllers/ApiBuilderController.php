@@ -147,16 +147,29 @@ class ApiBuilderController extends Controller
     private function generateDatabaseConfig()
     {
         require_once __DIR__ . '/../../config/database.php';
-        $dbConfig = getDatabaseConfig('production');
-
+        $devConfig = getDatabaseConfig('development');
+        $prodConfig = getDatabaseConfig('production');
 
         $content = <<<PHP
 <?php
-// Database configuration
-define('DB_HOST', '127.0.0.1');
-define('DB_NAME', '{$dbConfig['dbname']}');
-define('DB_USER', '{$dbConfig['user']}');
-define('DB_PASS', '{$dbConfig['pass']}');
+// Database configuration - Auto-detect environment
+\$isAltervista = strpos(\$_SERVER['HTTP_HOST'] ?? '', 'altervista.org') !== false 
+    || strpos(\$_SERVER['SERVER_NAME'] ?? '', 'altervista.org') !== false
+    || isset(\$_SERVER['AlterVista']);
+
+if (\$isAltervista) {
+    // Production - Altervista
+    define('DB_HOST', 'localhost');
+    define('DB_NAME', '{$prodConfig['dbname']}');
+    define('DB_USER', trim('{$prodConfig['user']}')); // Trim per rimuovere spazi
+    define('DB_PASS', '{$prodConfig['pass']}');
+} else {
+    // Development - Local
+    define('DB_HOST', '127.0.0.1');
+    define('DB_NAME', '{$devConfig['dbname']}');
+    define('DB_USER', '{$devConfig['user']}');
+    define('DB_PASS', '{$devConfig['pass']}');
+}
 
 class Database {
     private \$host = DB_HOST;
@@ -168,8 +181,7 @@ class Database {
     public function getConnection() {
         \$this->conn = null;
         try {
-            // Usa 127.0.0.1 invece di localhost per evitare problemi con socket Unix
-            \$dsn = "mysql:host=127.0.0.1;dbname=" . \$this->db_name;
+            \$dsn = "mysql:host=" . \$this->host . ";dbname=" . \$this->db_name;
             \$this->conn = new PDO(\$dsn, \$this->username, \$this->password);
             
             \$this->conn->exec("set names utf8");
@@ -281,42 +293,121 @@ PHP;
     // ===== GENERAZIONE TABELLE =====
     private function generateTablesApi($currentDbConfig)
     {
+        // Tabelle di sistema da escludere dalla generazione
+        $systemTables = ['security_logs', 'rate_limits', 'banned_ips', 'failed_attempts'];
+        
         foreach ($currentDbConfig as $tableName => $tableConfig) {
-            // Salta _views
-            if ($tableName === '_views' || substr($tableName, 0, 6) === '_view_') {
+            // Salta la sezione _views e le tabelle di sistema
+            if ($tableName === '_views' || in_array($tableName, $systemTables)) {
                 continue;
             }
 
             if (isset($tableConfig['enabled']) && $tableConfig['enabled'] === true) {
-                $columns = $this->getTableColumns($tableName);
-                $this->generateModel($tableName, $columns);
-                $this->generateEndpoint($tableName, $tableConfig, $columns);
+                // Verifica se è una view virtuale
+                $isVirtualView = (substr($tableName, 0, 6) === '_view_');
+                
+                if ($isVirtualView) {
+                    // Per le views virtuali, estrai il nome reale della view e ottieni le colonne dalla query
+                    $realViewName = substr($tableName, 6); // Rimuovi il prefisso _view_
+                    
+                    // Verifica che la view esista nella sezione _views
+                    if (!isset($currentDbConfig['_views'][$realViewName])) {
+                        error_log("View definition not found for: {$realViewName}");
+                        continue;
+                    }
+                    
+                    $viewDef = $currentDbConfig['_views'][$realViewName];
+                    $query = $viewDef['query'] ?? '';
+                    
+                    if (empty($query)) {
+                        error_log("Empty query for view: {$realViewName}");
+                        continue;
+                    }
+                    
+                    // Ottieni le colonne eseguendo la query con LIMIT 0
+                    $columns = $this->getViewColumns($query);
+                    if (empty($columns)) {
+                        error_log("No columns found for view: {$realViewName}");
+                        continue;
+                    }
+                    
+                    $viewRequireAuth = $viewDef['require_auth'] ?? false;
+                    $this->generateModel($tableName, $columns, true, $query);
+                    $this->generateEndpoint($tableName, $tableConfig, $columns, true, $viewRequireAuth);
+                } else {
+                    // Per le tabelle normali, usa DESCRIBE
+                    $columns = $this->getTableColumns($tableName);
+                    $isView = (substr($tableName, 0, 2) === 'v_');
+                    $this->generateModel($tableName, $columns, $isView);
+                    $this->generateEndpoint($tableName, $tableConfig, $columns, $isView);
+                }
             }
         }
     }
 
-    private function generateModel($tableName, $columns)
+    private function generateModel($tableName, $columns, $isView = false, $viewQuery = null)
     {
         $className = $this->toCamelCase($tableName);
         $primaryKey = $this->getPrimaryKey($columns);
 
-        // Genera campi per INSERT/UPDATE
-        $fields = [];
-        foreach ($columns as $column) {
-            if ($column['Field'] !== $primaryKey && $column['Extra'] !== 'auto_increment') {
-                $fields[] = $column['Field'];
-            }
-        }
+        // Per le viste, genera solo metodi di lettura
+        if ($isView && $viewQuery) {
+            // Viste personalizzate con query SQL
+            // Prepara la query per l'inclusione nel codice (escape)
+            // Rimuovi semicolon finale poiché verrà usata in sottoquery
+            $trimmedQuery = trim($viewQuery);
+            $trimmedQuery = rtrim($trimmedQuery, ';');
+            $escapedQuery = str_replace("'", "\\'", $trimmedQuery);
+            
+            $content = <<<PHP
+<?php
+require_once __DIR__ . '/../config/database.php';
 
-        $bindParams = '';
-        $setParams = '';
-        foreach ($fields as $field) {
-            $bindParams .= "        \$stmt->bindParam(\":{$field}\", \$data['{$field}']);\n";
-            $setParams .= "{$field}=:{$field}, ";
-        }
-        $setParams = rtrim($setParams, ', ');
+class {$className} {
+    private \$conn;
+    private \$query = '{$escapedQuery}';
 
-        $content = <<<PHP
+    public function __construct(\$db) {
+        \$this->conn = \$db;
+    }
+
+    public function getAll() {
+        \$stmt = \$this->conn->prepare(\$this->query);
+        \$stmt->execute();
+        return \$stmt;
+    }
+
+    public function getById(\$id) {
+        // Per le viste, getById filtra i risultati della query
+        \$query = "SELECT * FROM (" . \$this->query . ") AS view_result WHERE {$primaryKey} = ? LIMIT 1";
+        \$stmt = \$this->conn->prepare(\$query);
+        \$stmt->bindParam(1, \$id);
+        \$stmt->execute();
+        return \$stmt;
+    }
+
+    // Filtra per azienda_id dell'utente autenticato
+    public function getAllByAzienda(\$azienda_id) {
+        \$query = "SELECT * FROM (" . \$this->query . ") AS view_result WHERE azienda_id = ? ORDER BY {$primaryKey}";
+        \$stmt = \$this->conn->prepare(\$query);
+        \$stmt->bindParam(1, \$azienda_id);
+        \$stmt->execute();
+        return \$stmt;
+    }
+
+    public function getByIdByAzienda(\$id, \$azienda_id) {
+        \$query = "SELECT * FROM (" . \$this->query . ") AS view_result WHERE {$primaryKey} = ? AND azienda_id = ? LIMIT 1";
+        \$stmt = \$this->conn->prepare(\$query);
+        \$stmt->bindParam(1, \$id);
+        \$stmt->bindParam(2, \$azienda_id);
+        \$stmt->execute();
+        return \$stmt;
+    }
+}
+
+PHP;
+        } elseif ($isView) {
+            $content = <<<PHP
 <?php
 require_once __DIR__ . '/../config/database.php';
 
@@ -339,6 +430,70 @@ class {$className} {
         \$query = "SELECT * FROM " . \$this->table_name . " WHERE {$primaryKey} = ? LIMIT 0,1";
         \$stmt = \$this->conn->prepare(\$query);
         \$stmt->bindParam(1, \$id);
+        \$stmt->execute();
+        return \$stmt;
+    }
+}
+
+PHP;
+        } else {
+            // Per le tabelle normali, genera anche metodi di scrittura
+            $fields = [];
+            foreach ($columns as $column) {
+                if ($column['Field'] !== $primaryKey && $column['Extra'] !== 'auto_increment') {
+                    $fields[] = $column['Field'];
+                }
+            }
+
+            $bindParams = '';
+            $setParams = '';
+            foreach ($fields as $field) {
+                $bindParams .= "        \$stmt->bindParam(\":{$field}\", \$data['{$field}']);\n";
+                $setParams .= "{$field}=:{$field}, ";
+            }
+            $setParams = rtrim($setParams, ', ');
+
+            $content = <<<PHP
+<?php
+require_once __DIR__ . '/../config/database.php';
+
+class {$className} {
+    private \$conn;
+    private \$table_name = "{$tableName}";
+
+    public function __construct(\$db) {
+        \$this->conn = \$db;
+    }
+
+    public function getAll() {
+        \$query = "SELECT * FROM " . \$this->table_name . " ORDER BY {$primaryKey}";
+        \$stmt = \$this->conn->prepare(\$query);
+        \$stmt->execute();
+        return \$stmt;
+    }
+
+    public function getById(\$id) {
+        \$query = "SELECT * FROM " . \$this->table_name . " WHERE {$primaryKey} = ? LIMIT 0,1";
+        \$stmt = \$this->conn->prepare(\$query);
+        \$stmt->bindParam(1, \$id);
+        \$stmt->execute();
+        return \$stmt;
+    }
+
+    // Filtra per azienda_id dell'utente autenticato
+    public function getAllByAzienda(\$azienda_id) {
+        \$query = "SELECT * FROM " . \$this->table_name . " WHERE azienda_id = ? ORDER BY {$primaryKey}";
+        \$stmt = \$this->conn->prepare(\$query);
+        \$stmt->bindParam(1, \$azienda_id);
+        \$stmt->execute();
+        return \$stmt;
+    }
+
+    public function getByIdByAzienda(\$id, \$azienda_id) {
+        \$query = "SELECT * FROM " . \$this->table_name . " WHERE {$primaryKey} = ? AND azienda_id = ? LIMIT 0,1";
+        \$stmt = \$this->conn->prepare(\$query);
+        \$stmt->bindParam(1, \$id);
+        \$stmt->bindParam(2, \$azienda_id);
         \$stmt->execute();
         return \$stmt;
     }
@@ -384,28 +539,32 @@ class {$className} {
 }
 
 PHP;
+        }
+        
         file_put_contents($this->outputPath . "/models/{$className}.php", $content);
     }
 
-    private function generateEndpoint($tableName, $config, $columns)
+    private function generateEndpoint($tableName, $config, $columns, $isView = false, $viewRequireAuth = false)
     {
         $className = $this->toCamelCase($tableName);
         $primaryKey = $this->getPrimaryKey($columns);
 
         // Controllo autenticazione
-        $requiresAuth = ($config['select'] !== 'all' || $config['insert'] !== 'all' ||
+        $requiresAuth = $viewRequireAuth || ($config['select'] !== 'all' || $config['insert'] !== 'all' ||
             $config['update'] !== 'all' || $config['delete'] !== 'all');
 
         $authRequire = $requiresAuth ? "require_once __DIR__ . '/../middleware/auth.php';" : "";
 
-        // Validazione campi obbligatori
+        // Validazione campi obbligatori (solo per tabelle, non per views)
         $requiredFields = [];
-        foreach ($columns as $column) {
-            if (
-                $column['Null'] === 'NO' && $column['Extra'] !== 'auto_increment' &&
-                $column['Field'] !== $primaryKey && !isset($column['Default'])
-            ) {
-                $requiredFields[] = $column['Field'];
+        if (!$isView) {
+            foreach ($columns as $column) {
+                if (
+                    $column['Null'] === 'NO' && $column['Extra'] !== 'auto_increment' &&
+                    $column['Field'] !== $primaryKey && !isset($column['Default'])
+                ) {
+                    $requiredFields[] = $column['Field'];
+                }
             }
         }
 
@@ -418,8 +577,13 @@ PHP;
             $requiredCheck = "if(" . implode(' || ', $checks) . ") {\n        sendResponse(400, null, 'Missing required fields');\n    }\n    ";
         }
 
-        // Controlli di autenticazione per ogni operazione
-        $selectAuth = $config['select'] !== 'all' ? "\$user = requireAuth();" : "";
+        // Controlli di autenticazione
+        $selectAuth = '';
+        if ($isView && $viewRequireAuth) {
+            $selectAuth = "\$user = requireAuth();";
+        } else {
+            $selectAuth = $config['select'] !== 'all' ? "\$user = requireAuth();" : "";
+        }
         $insertAuth = $config['insert'] !== 'all' ? "\$user = requireAuth();" : "";
         $updateAuth = $config['update'] !== 'all' ? "\$user = requireAuth();" : "";
         $deleteAuth = $config['delete'] !== 'all' ? "\$user = requireAuth();" : "";
@@ -428,7 +592,105 @@ PHP;
         $rateLimit = $config['rate_limit'] ?? 100;
         $rateLimitWindow = $config['rate_limit_window'] ?? 60;
 
-        $content = <<<PHP
+        // Per le views, genera solo endpoint GET (sola lettura)
+        if ($isView) {
+            $content = <<<PHP
+<?php
+require_once __DIR__ . '/../cors.php';
+require_once __DIR__ . '/../config/helpers.php';
+require_once __DIR__ . '/../config/database.php';
+{$authRequire}
+require_once __DIR__ . '/../middleware/security_helper.php';
+require_once __DIR__ . '/../models/{$className}.php';
+
+applySecurity('{$tableName}', {$rateLimit}, {$rateLimitWindow});
+
+\$database = new Database();
+\$db = \$database->getConnection();
+\$model = new {$className}(\$db);
+
+\$method = \$_SERVER['REQUEST_METHOD'];
+\$request_uri = \$_SERVER['REQUEST_URI'];
+\$path = parse_url(\$request_uri, PHP_URL_PATH);
+\$path_parts = array_values(array_filter(explode('/', \$path)));
+\$last_part = end(\$path_parts) ?: '';
+\$prev_part = \$path_parts[count(\$path_parts) - 2] ?? '';
+\$view_table = '{$tableName}';
+\$view_slug = substr(\$view_table, 6); // rimuove prefisso _view_
+
+// Supporta sia /api/_view_nomevista che /api/views/nomevista
+\$id = null;
+if (\$prev_part === 'views') {
+    // /api/views/{view}/{id?}
+    if (\$last_part !== \$view_slug && \$last_part !== \$view_table) {
+        \$id = \$last_part;
+    }
+} else {
+    // /api/_view_{view}/{id?}
+    if (\$last_part !== \$view_table && \$last_part !== \$view_slug && \$last_part !== 'views') {
+        \$id = \$last_part;
+    }
+}
+
+switch(\$method) {
+    case 'GET':
+        \$user = null;
+        {$selectAuth}
+        // Se autenticato, filtra per azienda_id dell'utente
+        if (!empty(\$user)) {
+            // Utente autenticato - filtra per azienda
+            if (\$id && \$id !== '{$tableName}' && \$id !== \$view_slug) {
+                \$stmt = \$model->getByIdByAzienda(\$id, \$user['azienda_id']);
+                \$row = \$stmt->fetch(PDO::FETCH_ASSOC);
+                
+                if(\$row) {
+                    sendResponse(200, \$row);
+                } else {
+                    sendResponse(404, null, 'Not found');
+                }
+            } else {
+                \$stmt = \$model->getAllByAzienda(\$user['azienda_id']);
+                \$items = array();
+                
+                while (\$row = \$stmt->fetch(PDO::FETCH_ASSOC)) {
+                    array_push(\$items, \$row);
+                }
+                
+                sendResponse(200, \$items);
+            }
+        } else {
+            // Pubblico - nessun filtro
+            if (\$id && \$id !== '{$tableName}' && \$id !== \$view_slug) {
+                \$stmt = \$model->getById(\$id);
+                \$row = \$stmt->fetch(PDO::FETCH_ASSOC);
+                
+                if(\$row) {
+                    sendResponse(200, \$row);
+                } else {
+                    sendResponse(404, null, 'Not found');
+                }
+            } else {
+                \$stmt = \$model->getAll();
+                \$items = array();
+                
+                while (\$row = \$stmt->fetch(PDO::FETCH_ASSOC)) {
+                    array_push(\$items, \$row);
+                }
+                
+                sendResponse(200, \$items);
+            }
+        }
+        break;
+        
+    default:
+        sendResponse(405, null, 'Method not allowed. Views are read-only.');
+        break;
+}
+
+PHP;
+        } else {
+            // Endpoint completo per tabelle normali
+            $content = <<<PHP
 <?php
 require_once __DIR__ . '/../cors.php';
 require_once __DIR__ . '/../config/helpers.php';
@@ -451,25 +713,50 @@ applySecurity('{$tableName}', {$rateLimit}, {$rateLimitWindow});
 
 switch(\$method) {
     case 'GET':
+        \$user = null;
         {$selectAuth}
-        if (\$id && \$id !== '{$tableName}') {
-            \$stmt = \$model->getById(\$id);
-            \$row = \$stmt->fetch(PDO::FETCH_ASSOC);
-            
-            if(\$row) {
-                sendResponse(200, \$row);
+        if (!empty(\$user)) {
+            // Utente autenticato - filtra per azienda se la tabella ha azienda_id
+            if (\$id && \$id !== '{$tableName}') {
+                \$stmt = \$model->getByIdByAzienda(\$id, \$user['azienda_id']);
+                \$row = \$stmt->fetch(PDO::FETCH_ASSOC);
+                
+                if(\$row) {
+                    sendResponse(200, \$row);
+                } else {
+                    sendResponse(404, null, 'Not found');
+                }
             } else {
-                sendResponse(404, null, 'Not found');
+                \$stmt = \$model->getAllByAzienda(\$user['azienda_id']);
+                \$items = array();
+                
+                while (\$row = \$stmt->fetch(PDO::FETCH_ASSOC)) {
+                    array_push(\$items, \$row);
+                }
+                
+                sendResponse(200, \$items);
             }
         } else {
-            \$stmt = \$model->getAll();
-            \$items = array();
-            
-            while (\$row = \$stmt->fetch(PDO::FETCH_ASSOC)) {
-                array_push(\$items, \$row);
+            // Pubblico o nessuna auth richiesta
+            if (\$id && \$id !== '{$tableName}') {
+                \$stmt = \$model->getById(\$id);
+                \$row = \$stmt->fetch(PDO::FETCH_ASSOC);
+                
+                if(\$row) {
+                    sendResponse(200, \$row);
+                } else {
+                    sendResponse(404, null, 'Not found');
+                }
+            } else {
+                \$stmt = \$model->getAll();
+                \$items = array();
+                
+                while (\$row = \$stmt->fetch(PDO::FETCH_ASSOC)) {
+                    array_push(\$items, \$row);
+                }
+                
+                sendResponse(200, \$items);
             }
-            
-            sendResponse(200, \$items);
         }
         break;
         
@@ -511,6 +798,8 @@ switch(\$method) {
 }
 
 PHP;
+        }
+        
         file_put_contents($this->outputPath . "/endpoints/{$tableName}.php", $content);
     }
 
@@ -550,10 +839,14 @@ PHP;
 
     private function generateHtaccess()
     {
+        // Leggi FTP_REMOTE_PATH dall'env per impostare il RewriteBase
+        $remotePath = env('FTP_REMOTE_PATH', '/');
+        $rewriteBase = $remotePath !== '/' ? "RewriteBase $remotePath/\n" : "";
+        
         // 1. .htaccess per Apache
-        $rootHtaccess = <<<'HTACCESS'
+        $rootHtaccess = <<<HTACCESS
 RewriteEngine On
-
+$rewriteBase
 # CORS Headers per Altervista
 <IfModule mod_headers.c>
     Header always set Access-Control-Allow-Origin "*"
@@ -564,19 +857,25 @@ RewriteEngine On
 
 # Handle preflight OPTIONS requests
 RewriteCond %{REQUEST_METHOD} OPTIONS
-RewriteRule ^(.*)$ $1 [R=200,L]
+RewriteRule ^(.*)$ \$1 [R=200,L]
 
 # Route /api/auth/login to endpoints/auth.php
-RewriteRule ^api/auth/login/?$ endpoints/auth.php [QSA,L]
+RewriteRule ^api/auth/login/?\$ endpoints/auth.php [QSA,L]
 
 # Route /api/auth/me to auth/me.php
-RewriteRule ^api/auth/me/?$ auth/me.php [QSA,L]
+RewriteRule ^api/auth/me/?\$ auth/me.php [QSA,L]
+
+# Route /api/views/{view} to endpoints/_view_{view}.php (read-only views)
+RewriteRule ^api/views/([^/]+)/?$ endpoints/_view_$1.php [QSA,L]
+
+# Route /api/views/{view}/{id} to endpoints/_view_{view}.php
+RewriteRule ^api/views/([^/]+)/([0-9]+)$ endpoints/_view_$1.php [QSA,L]
 
 # Route /api/{table} to endpoints/{table}.php
-RewriteRule ^api/([^/]+)/?$ endpoints/$1.php [QSA,L]
+RewriteRule ^api/([^/]+)/?\$ endpoints/\$1.php [QSA,L]
 
 # Route /api/{table}/{id} to endpoints/{table}.php
-RewriteRule ^api/([^/]+)/([0-9]+)$ endpoints/$1.php [QSA,L]
+RewriteRule ^api/([^/]+)/([0-9]+)\$ endpoints/\$1.php [QSA,L]
 
 # Disable directory listing
 Options -Indexes
@@ -619,6 +918,22 @@ if (preg_match('#^/api/auth/me/?$#', $path)) {
     exit;
 }
 
+// Route /api/views/{view}/{id?} to endpoints/_view_{view}.php (read-only)
+if (preg_match('#^/api/views/([^/]+)(?:/([0-9]+))?$#', $path, $matches)) {
+    $viewName = $matches[1];
+    $endpoint_file = __DIR__ . '/endpoints/_view_' . $viewName . '.php';
+    if (file_exists($endpoint_file)) {
+        // Normalizza REQUEST_URI per gli endpoint generati (_view_{name})
+        $normalized = '/api/_view_' . $viewName;
+        if (!empty($matches[2])) {
+            $normalized .= '/' . $matches[2];
+        }
+        $_SERVER['REQUEST_URI'] = $normalized;
+        require $endpoint_file;
+        exit;
+    }
+}
+
 // Route /api/{table}/{id} to endpoints/{table}.php
 if (preg_match('#^/api/([^/]+)/([0-9]+)$#', $path, $matches)) {
     require __DIR__ . '/endpoints/' . $matches[1] . '.php';
@@ -655,7 +970,6 @@ PHP;
     {
         return array_filter($currentDbConfig, function ($table, $key) {
             return $key !== '_views'
-                && substr($key, 0, 6) !== '_view_'
                 && isset($table['enabled'])
                 && $table['enabled'] === true;
         }, ARRAY_FILTER_USE_BOTH);
@@ -665,6 +979,36 @@ PHP;
     {
         $stmt = $this->db->getConnection()->query("DESCRIBE `{$tableName}`");
         return $stmt->fetchAll();
+    }
+    
+    private function getViewColumns($query)
+    {
+        try {
+            // Esegui la query con LIMIT 0 per ottenere solo le colonne senza dati
+            $limitedQuery = rtrim(trim($query), ';') . ' LIMIT 0';
+            $stmt = $this->db->getConnection()->query($limitedQuery);
+            
+            // Ottieni le informazioni sulle colonne dal risultato
+            $columnCount = $stmt->columnCount();
+            $columns = [];
+            
+            for ($i = 0; $i < $columnCount; $i++) {
+                $meta = $stmt->getColumnMeta($i);
+                $columns[] = [
+                    'Field' => $meta['name'],
+                    'Type' => $meta['native_type'] ?? 'string',
+                    'Null' => 'YES',
+                    'Key' => ($i === 0) ? 'PRI' : '', // Prima colonna come chiave primaria per convenzione
+                    'Default' => null,
+                    'Extra' => ''
+                ];
+            }
+            
+            return $columns;
+        } catch (\PDOException $e) {
+            error_log("Error getting view columns: " . $e->getMessage());
+            return [];
+        }
     }
 
     private function getPrimaryKey($columns)

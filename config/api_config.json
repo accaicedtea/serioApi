@@ -1,52 +1,181 @@
 {
-    "my_menu": {
+    "acca_totem": {
         "allergens": {
-            "enabled": true,
-            "rate_limit": 100,
-            "rate_limit_window": 60,
-            "max_results": 100,
-            "enable_cache": true,
-            "cache_ttl": 300,
-            "select": "all",
-            "insert": "auth",
-            "update": "auth",
-            "delete": "admin"
-        },
-        "banned_ips": {
-            "enabled": false
-        },
-        "custom_queries": {
-            "enabled": false
-        },
-        "failed_attempts": {
-            "enabled": false
-        },
-        "generated_apis": {
-            "enabled": false
-        },
-        "menu_categories": {
             "enabled": true,
             "rate_limit": 100,
             "rate_limit_window": 60,
             "max_results": 100,
             "enable_cache": false,
             "cache_ttl": 300,
-            "select": "all",
-            "insert": "auth",
+            "select": "auth",
+            "insert": "admin",
+            "update": "admin",
+            "delete": "admin"
+        },
+        "audit_allergens": {
+            "enabled": true,
+            "rate_limit": 100,
+            "rate_limit_window": 60,
+            "max_results": 100,
+            "enable_cache": false,
+            "cache_ttl": 300,
+            "select": "auth",
+            "insert": "admin",
+            "update": "admin",
+            "delete": "admin"
+        },
+        "audit_categories": {
+            "enabled": true,
+            "rate_limit": 100,
+            "rate_limit_window": 60,
+            "max_results": 100,
+            "enable_cache": false,
+            "cache_ttl": 300,
+            "select": "auth",
+            "insert": "admin",
+            "update": "admin",
+            "delete": "admin"
+        },
+        "audit_ingredients": {
+            "enabled": true,
+            "rate_limit": 100,
+            "rate_limit_window": 60,
+            "max_results": 100,
+            "enable_cache": false,
+            "cache_ttl": 300,
+            "select": "auth",
+            "insert": "admin",
+            "update": "admin",
+            "delete": "admin"
+        },
+        "audit_products": {
+            "enabled": true,
+            "rate_limit": 100,
+            "rate_limit_window": 60,
+            "max_results": 100,
+            "enable_cache": false,
+            "cache_ttl": 300,
+            "select": "auth",
+            "insert": "admin",
+            "update": "admin",
+            "delete": "admin"
+        },
+        "audit_promotions": {
+            "enabled": true,
+            "rate_limit": 100,
+            "rate_limit_window": 60,
+            "max_results": 100,
+            "enable_cache": false,
+            "cache_ttl": 300,
+            "select": "auth",
+            "insert": "admin",
+            "update": "admin",
+            "delete": "admin"
+        },
+        "azienda": {
+            "enabled": false
+        },
+        "banned_ips": {
+            "enabled": false
+        },
+        "categories": {
+            "enabled": true,
+            "rate_limit": 100,
+            "rate_limit_window": 60,
+            "max_results": 100,
+            "enable_cache": false,
+            "cache_ttl": 300,
+            "select": "auth",
+            "insert": "admin",
+            "update": "admin",
+            "delete": "admin"
+        },
+        "failed_attempts": {
+            "enabled": false
+        },
+        "ingredient_allergens": {
+            "enabled": true,
+            "rate_limit": 100,
+            "rate_limit_window": 60,
+            "max_results": 100,
+            "enable_cache": false,
+            "cache_ttl": 300,
+            "select": "auth",
+            "insert": "admin",
+            "update": "admin",
+            "delete": "admin"
+        },
+        "ingredients": {
+            "enabled": true,
+            "rate_limit": 100,
+            "rate_limit_window": 60,
+            "max_results": 100,
+            "enable_cache": false,
+            "cache_ttl": 300,
+            "select": "auth",
+            "insert": "admin",
+            "update": "admin",
+            "delete": "admin"
+        },
+        "product_allergens": {
+            "enabled": true,
+            "rate_limit": 100,
+            "rate_limit_window": 60,
+            "max_results": 100,
+            "enable_cache": false,
+            "cache_ttl": 300,
+            "select": "auth",
+            "insert": "admin",
+            "update": "admin",
+            "delete": "admin"
+        },
+        "product_ingredients": {
+            "enabled": true,
+            "rate_limit": 100,
+            "rate_limit_window": 60,
+            "max_results": 100,
+            "enable_cache": false,
+            "cache_ttl": 300,
+            "select": "auth",
+            "insert": "admin",
+            "update": "admin",
+            "delete": "admin"
+        },
+        "product_promotions": {
+            "enabled": true,
+            "rate_limit": 100,
+            "rate_limit_window": 60,
+            "max_results": 100,
+            "enable_cache": false,
+            "cache_ttl": 300,
+            "select": "auth",
+            "insert": "admin",
+            "update": "admin",
+            "delete": "admin"
+        },
+        "products": {
+            "enabled": true,
+            "rate_limit": 100,
+            "rate_limit_window": 60,
+            "max_results": 100,
+            "enable_cache": false,
+            "cache_ttl": 300,
+            "select": "auth",
+            "insert": "admin",
             "update": "auth",
             "delete": "admin"
         },
-        "menu_item_allergens": {
-            "enabled": false
-        },
-        "menu_items": {
-            "enabled": false
-        },
-        "menu_sub_items": {
-            "enabled": false
-        },
-        "nav_links": {
-            "enabled": false
+        "promotions": {
+            "enabled": true,
+            "rate_limit": 100,
+            "rate_limit_window": 60,
+            "max_results": 100,
+            "enable_cache": false,
+            "cache_ttl": 300,
+            "select": "auth",
+            "insert": "admin",
+            "update": "admin",
+            "delete": "admin"
         },
         "rate_limits": {
             "enabled": false
@@ -57,14 +186,77 @@
         "user_auth": {
             "enabled": false
         },
-        "users": {
-            "enabled": false
-        },
         "_views": {
-            "testoo": {
-                "name": "testoo",
-                "description": "",
-                "query": "select *\nfrom allergens",
+            "v_products_full": {
+                "name": "v_products_full",
+                "description": "Tutti i prodotti con categoria, allergeni e ingredienti",
+                "query": "SELECT \n    p.id AS product_id,\n    p.azienda_id,\n    a.name AS azienda_name,\n    p.name AS product_name,\n    p.slug AS product_slug,\n    p.description AS product_description,\n    p.price,\n    p.image,\n    p.is_available,\n    p.is_featured,\n    p.stock,\n    p.notes,\n    c.id AS category_id,\n    c.name AS category_name,\n    c.slug AS category_slug,\n    c.icon AS category_icon,\n    c.color AS category_color,\n    GROUP_CONCAT(DISTINCT CONCAT(al.id, ':', al.name, ':', COALESCE(al.icon, '')) ORDER BY al.name SEPARATOR '|') AS allergens,\n    GROUP_CONCAT(DISTINCT CONCAT(i.id, ':', i.name, ':', COALESCE(pi.quantity, 0), ':', pi.is_optional) ORDER BY i.name SEPARATOR '|') AS ingredients,\n    p.created_at,\n    p.updated_at\nFROM products p\nINNER JOIN azienda a ON p.azienda_id = a.id\nINNER JOIN categories c ON p.category_id = c.id\nLEFT JOIN product_allergens pa ON p.id = pa.product_id\nLEFT JOIN allergens al ON pa.allergen_id = al.id\nLEFT JOIN product_ingredients pi ON p.id = pi.product_id\nLEFT JOIN ingredients i ON pi.ingredient_id = i.id\nGROUP BY p.id, p.azienda_id, a.name, p.name, p.slug, p.description, p.price, p.image, \n         p.is_available, p.is_featured, p.stock, p.notes, c.id, c.name, c.slug, \n         c.icon, c.color, p.created_at, p.updated_at;",
+                "rate_limit": 1000,
+                "rate_limit_window": 60,
+                "max_results": 1000,
+                "require_auth": true,
+                "enable_cache": false,
+                "cache_ttl": 3000
+            },
+            "v_categories_with_count": {
+                "name": "v_categories_with_count",
+                "description": "Categorie con conteggio prodotti per azienda",
+                "query": "SELECT \n    c.id AS category_id,\n    c.azienda_id,\n    a.name AS azienda_name,\n    c.name AS category_name,\n    c.slug AS category_slug,\n    c.description,\n    c.icon,\n    c.color,\n    c.sort_order,\n    c.is_active,\n    COUNT(p.id) AS products_count,\n    COUNT(CASE WHEN p.is_available = 1 THEN 1 END) AS available_products_count,\n    c.created_at,\n    c.updated_at\nFROM categories c\nINNER JOIN azienda a ON c.azienda_id = a.id\nLEFT JOIN products p ON c.id = p.category_id\nGROUP BY c.id, c.azienda_id, a.name, c.name, c.slug, c.description, \n         c.icon, c.color, c.sort_order, c.is_active, c.created_at, c.updated_at;",
+                "rate_limit": 1000,
+                "rate_limit_window": 60,
+                "max_results": 100,
+                "require_auth": true,
+                "enable_cache": false,
+                "cache_ttl": 300
+            },
+            "v_ingredients_with_allergens": {
+                "name": "v_ingredients_with_allergens",
+                "description": "Ingredienti con allergeni associati per azienda",
+                "query": "SELECT \n    i.id AS ingredient_id,\n    i.azienda_id,\n    a.name AS azienda_name,\n    i.name AS ingredient_name,\n    i.description,\n    i.image,\n    i.price,\n    i.unit,\n    i.is_available,\n    GROUP_CONCAT(DISTINCT CONCAT(al.id, ':', al.name, ':', COALESCE(al.icon, '')) ORDER BY al.name SEPARATOR '|') AS allergens,\n    COUNT(DISTINCT pi.product_id) AS used_in_products,\n    i.created_at,\n    i.updated_at\nFROM ingredients i\nINNER JOIN azienda a ON i.azienda_id = a.id\nLEFT JOIN ingredient_allergens ia ON i.id = ia.ingredient_id\nLEFT JOIN allergens al ON ia.allergen_id = al.id\nLEFT JOIN product_ingredients pi ON i.id = pi.ingredient_id\nGROUP BY i.id, i.azienda_id, a.name, i.name, i.description, i.image, \n         i.price, i.unit, i.is_available, i.created_at, i.updated_at;",
+                "rate_limit": 100,
+                "rate_limit_window": 60,
+                "max_results": 100,
+                "require_auth": false,
+                "enable_cache": false,
+                "cache_ttl": 300
+            },
+            "v_allergens_usage": {
+                "name": "v_allergens_usage",
+                "description": "Allergeni con conteggio utilizzo in prodotti e ingredienti",
+                "query": "SELECT \n    al.id AS allergen_id,\n    al.azienda_id,\n    a.name AS azienda_name,\n    al.name AS allergen_name,\n    al.icon,\n    al.description,\n    al.is_active,\n    COUNT(DISTINCT pa.product_id) AS products_count,\n    COUNT(DISTINCT ia.ingredient_id) AS ingredients_count,\n    al.created_at,\n    al.updated_at\nFROM allergens al\nINNER JOIN azienda a ON al.azienda_id = a.id\nLEFT JOIN product_allergens pa ON al.id = pa.allergen_id\nLEFT JOIN ingredient_allergens ia ON al.id = ia.allergen_id",
+                "rate_limit": 100,
+                "rate_limit_window": 60,
+                "max_results": 100,
+                "require_auth": false,
+                "enable_cache": false,
+                "cache_ttl": 300
+            },
+            "v_azienda_stats": {
+                "name": "v_azienda_stats",
+                "description": "Statistiche complete per azienda",
+                "query": "SELECT \n    a.id AS azienda_id,\n    a.name AS azienda_name,\n    a.description,\n    a.logo,\n    a.is_active,\n    COUNT(DISTINCT p.id) AS total_products,\n    COUNT(DISTINCT CASE WHEN p.is_available = 1 THEN p.id END) AS available_products,\n    COUNT(DISTINCT c.id) AS total_categories,\n    COUNT(DISTINCT i.id) AS total_ingredients,\n    COUNT(DISTINCT al.id) AS total_allergens,\n    COUNT(DISTINCT u.id) AS total_users,\n    COUNT(DISTINCT CASE WHEN u.role = 'admin' THEN u.id END) AS admin_users,\n    a.created_at,\n    a.updated_at\nFROM azienda a\nLEFT JOIN products p ON a.id = p.azienda_id\nLEFT JOIN categories c ON a.id = c.azienda_id\nLEFT JOIN ingredients i ON a.id = i.azienda_id\nLEFT JOIN allergens al ON a.id = al.azienda_id\nLEFT JOIN user_auth u ON a.id = u.azienda_id\nGROUP BY a.id, a.name, a.description, a.logo, a.is_active, a.created_at, a.updated_at;",
+                "rate_limit": 100,
+                "rate_limit_window": 60,
+                "max_results": 100,
+                "require_auth": false,
+                "enable_cache": false,
+                "cache_ttl": 300
+            },
+            "v_products_with_promotions": {
+                "name": "v_products_with_promotions",
+                "description": "Prodotti con promozioni attive e prezzo scontato",
+                "query": "SELECT \n    p.id AS product_id,\n    p.azienda_id,\n    a.name AS azienda_name,\n    p.name AS product_name,\n    p.slug AS product_slug,\n    p.description AS product_description,\n    p.price AS original_price,\n    p.image,\n    p.is_available,\n    p.is_featured,\n    c.name AS category_name,\n    pr.id AS promotion_id,\n    pr.name AS promotion_name,\n    pr.discount_type,\n    pr.discount_value,\n    pr.start_date AS promotion_start,\n    pr.end_date AS promotion_end,\n    CASE \n        WHEN pr.discount_type = 'percentage' THEN p.price - (p.price * pr.discount_value \/ 100)\n        WHEN pr.discount_type = 'fixed' THEN p.price - pr.discount_value\n        ELSE p.price\n    END AS discounted_price,\n    CASE \n        WHEN pr.discount_type = 'percentage' THEN ROUND(pr.discount_value, 0)\n        WHEN pr.discount_type = 'fixed' THEN ROUND((pr.discount_value \/ p.price) * 100, 0)\n        ELSE 0\n    END AS discount_percentage,\n    CASE \n        WHEN pr.id IS NOT NULL AND NOW() BETWEEN pr.start_date AND pr.end_date AND pr.is_active = 1 THEN 1\n        ELSE 0\n    END AS has_active_promotion,\n    p.created_at,\n    p.updated_at\nFROM products p\nINNER JOIN azienda a ON p.azienda_id = a.id\nINNER JOIN categories c ON p.category_id = c.id\nLEFT JOIN product_promotions pp ON p.id = pp.product_id\nLEFT JOIN promotions pr ON pp.promotion_id = pr.id",
+                "rate_limit": 100,
+                "rate_limit_window": 60,
+                "max_results": 100,
+                "require_auth": false,
+                "enable_cache": false,
+                "cache_ttl": 300
+            },
+            "v_active_promotions": {
+                "name": "v_active_promotions",
+                "description": "Promozioni attive con conteggio prodotti",
+                "query": "SELECT \n    pr.id AS promotion_id,\n    pr.azienda_id,\n    a.name AS azienda_name,\n    pr.name AS promotion_name,\n    pr.description,\n    pr.discount_type,\n    pr.discount_value,\n    pr.start_date,\n    pr.end_date,\n    pr.is_active,\n    COUNT(DISTINCT pp.product_id) AS products_count,\n    CASE \n        WHEN NOW() < pr.start_date THEN 'upcoming'\n        WHEN NOW() BETWEEN pr.start_date AND pr.end_date THEN 'active'\n        WHEN NOW() > pr.end_date THEN 'expired'\n    END AS status,\n    DATEDIFF(pr.end_date, NOW()) AS days_remaining,\n    pr.created_at,\n    pr.updated_at\nFROM promotions pr\nINNER JOIN azienda a ON pr.azienda_id = a.id\nLEFT JOIN product_promotions pp ON pr.id = pp.promotion_id\nGROUP BY pr.id, pr.azienda_id, a.name, pr.name, pr.description, \n         pr.discount_type, pr.discount_value, pr.start_date, pr.end_date, \n         pr.is_active, pr.created_at, pr.updated_at;",
                 "rate_limit": 100,
                 "rate_limit_window": 60,
                 "max_results": 100,
@@ -73,10 +265,58 @@
                 "cache_ttl": 300
             }
         },
-        "_view_testoo": {
+        "_view_v_products_full": {
             "enabled": true,
             "is_virtual": true,
-            "view_name": "testoo"
+            "view_name": "v_products_full",
+            "rate_limit": 1000,
+            "rate_limit_window": 60,
+            "max_results": 1000,
+            "enable_cache": false,
+            "cache_ttl": 3000,
+            "select": "all",
+            "insert": "none",
+            "update": "none",
+            "delete": "none"
+        },
+        "_view_v_categories_with_count": {
+            "enabled": true,
+            "is_virtual": true,
+            "view_name": "v_categories_with_count",
+            "rate_limit": 1000,
+            "rate_limit_window": 60,
+            "max_results": 100,
+            "enable_cache": false,
+            "cache_ttl": 300,
+            "select": "all",
+            "insert": "none",
+            "update": "none",
+            "delete": "none"
+        },
+        "_view_v_ingredients_with_allergens": {
+            "enabled": false,
+            "is_virtual": true,
+            "view_name": "v_ingredients_with_allergens"
+        },
+        "_view_v_allergens_usage": {
+            "enabled": false,
+            "is_virtual": true,
+            "view_name": "v_allergens_usage"
+        },
+        "_view_v_azienda_stats": {
+            "enabled": false,
+            "is_virtual": true,
+            "view_name": "v_azienda_stats"
+        },
+        "_view_v_products_with_promotions": {
+            "enabled": false,
+            "is_virtual": true,
+            "view_name": "v_products_with_promotions"
+        },
+        "_view_v_active_promotions": {
+            "enabled": false,
+            "is_virtual": true,
+            "view_name": "v_active_promotions"
         }
     }
 }

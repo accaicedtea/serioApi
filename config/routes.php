@@ -99,6 +99,19 @@ $routes = [
         'action' => 'deleteView',
         'method' => 'POST'
     ],
+    
+    '/generator/jwt' => [
+        'controller' => 'GeneratorController',
+        'action' => 'jwt',
+        'method' => 'GET'
+    ],
+    
+    '/generator/jwt/save' => [
+        'controller' => 'GeneratorController',
+        'action' => 'saveJwt',
+        'method' => 'POST'
+    ],
+    
     // API Builder routes
     '/generator/builder' => [
         'controller' => 'ApiBuilderController',

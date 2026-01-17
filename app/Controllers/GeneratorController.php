@@ -428,4 +428,84 @@ public function views() {
         header('Location: /generator?saved=101');
         exit;
     }
+    
+    public function jwt() {
+        $data = [
+            'title' => 'API Generator - Configurazione JWT',
+            'databaseType' => $this->db->getConnectionType(),
+            'connectionStatus' => $this->db->isConnected(),
+            'databaseName' => $this->db->getDatabaseName(),
+            'currentDatabase' => $this->db->getDatabaseName(),
+            'customFields' => [],
+            'availableFields' => [],
+            'error' => null
+        ];
+        
+        // Recupera i campi della tabella user_auth
+        try {
+            $columns = $this->db->getTableColumns('user_auth');
+            $standardFields = ['id', 'password', 'email', 'name', 'role', 'is_active', 'last_login', 'created_at', 'updated_at'];
+            
+            // Filtra i campi standard che sono già nel JWT
+            $data['availableFields'] = array_filter($columns, function($col) use ($standardFields) {
+                return !in_array($col['name'], $standardFields);
+            });
+        } catch (\Exception $e) {
+            $data['error'] = 'Errore nel recupero dei campi della tabella user_auth: ' . $e->getMessage();
+        }
+        
+        // Carica la configurazione JWT esistente
+        $config = loadApiConfig();
+        $databaseName = $this->db->getDatabaseName();
+        
+        if (isset($config[$databaseName]['_jwt_config']['custom_fields'])) {
+            $data['customFields'] = $config[$databaseName]['_jwt_config']['custom_fields'];
+        }
+        
+        $this->view('generator/jwt', $data);
+    }
+    
+    public function saveJwt(): never {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            header('Location: /generator/jwt');
+            exit;
+        }
+        
+        if (!Security::checkCsrf($_POST['csrf_token'] ?? '')) {
+            die('Token CSRF non valido');
+        }
+        
+        // Raccogli i campi personalizzati
+        $customFields = [];
+        $fieldNames = $_POST['custom_field_name'] ?? [];
+        $fieldTypes = $_POST['custom_field_type'] ?? [];
+        
+        foreach ($fieldNames as $index => $name) {
+            if (!empty($name)) {
+                $customFields[] = [
+                    'name' => trim($name),
+                    'type' => $fieldTypes[$index] ?? 'string'
+                ];
+            }
+        }
+        
+        // Carica la configurazione esistente
+        $config = loadApiConfig();
+        $databaseName = $this->db->getDatabaseName();
+        
+        // Assicurati che il database esista nella config
+        if (!isset($config[$databaseName])) {
+            $config[$databaseName] = [];
+        }
+        
+        // Salva la configurazione JWT
+        $config[$databaseName]['_jwt_config'] = [
+            'custom_fields' => $customFields
+        ];
+        
+        saveApiConfig($config);
+        
+        header('Location: /generator/jwt?saved=1');
+        exit;
+    }
 }

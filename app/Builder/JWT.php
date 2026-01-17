@@ -17,7 +17,7 @@ class JWTHandler {
             'email' => $user['email'] ?? '',
             'role' => $user['role'] ?? 'user',
             'name' => $user['name'] ?? '',
-            'azienda_id' => (int)($user['azienda_id'] ?? 0),
+            // __CUSTOM_FIELDS__ - Campi personalizzati verranno inseriti qui dal builder
             'iat' => $now,
             'nbf' => $now,
             'exp' => $now + $this->ttl,

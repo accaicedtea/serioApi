@@ -240,6 +240,42 @@ PHP;
 
         // Applica le sostituzioni
         $rendered = strtr($tpl, $vars);
+        
+        // Aggiungi i campi personalizzati dal config
+        $config = $this->loadConfig();
+        $currentDbConfig = $config[$this->db->getDatabaseName()] ?? [];
+        $customFieldsCode = '';
+        
+        if (isset($currentDbConfig['_jwt_config']['custom_fields'])) {
+            $customFields = $currentDbConfig['_jwt_config']['custom_fields'];
+            foreach ($customFields as $field) {
+                $fieldName = $field['name'];
+                $fieldType = $field['type'];
+                
+                // Genera il codice per ogni campo in base al tipo
+                switch ($fieldType) {
+                    case 'int':
+                        $customFieldsCode .= "            '{$fieldName}' => (int)(\$user['{$fieldName}'] ?? 0),\n";
+                        break;
+                    case 'bool':
+                        $customFieldsCode .= "            '{$fieldName}' => (bool)(\$user['{$fieldName}'] ?? false),\n";
+                        break;
+                    case 'float':
+                        $customFieldsCode .= "            '{$fieldName}' => (float)(\$user['{$fieldName}'] ?? 0.0),\n";
+                        break;
+                    default: // string
+                        $customFieldsCode .= "            '{$fieldName}' => \$user['{$fieldName}'] ?? '',\n";
+                        break;
+                }
+            }
+        }
+        
+        // Sostituisci il placeholder dei campi personalizzati
+        $rendered = str_replace(
+            '            // __CUSTOM_FIELDS__ - Campi personalizzati verranno inseriti qui dal builder',
+            rtrim($customFieldsCode),
+            $rendered
+        );
 
         file_put_contents($outFile, $rendered);
     }

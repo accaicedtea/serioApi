@@ -16,6 +16,9 @@
                 <a href="/generator/views" class="btn <?= ($currentPath ?? '') === '/generator/views' ? 'btn-primary' : 'btn-outline-secondary' ?>">
                      <i class="fas fa-eye"></i> Viste Personalizzate
                 </a>
+                <a href="/generator/jwt" class="btn <?= ($currentPath ?? '') === '/generator/jwt' ? 'btn-primary' : 'btn-outline-secondary' ?>">
+                     <i class="fas fa-key"></i> Configurazione JWT
+                </a>
                 <a href="/generator/builder" class="btn <?= ($currentPath ?? '') === '/generator/builder' ? 'btn-success' : 'btn-outline-success' ?>">
                      <i class="fas fa-cogs"></i> Genera API
                 </a>

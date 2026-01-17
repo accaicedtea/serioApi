@@ -317,6 +317,15 @@
             "enabled": false,
             "is_virtual": true,
             "view_name": "v_active_promotions"
+        },
+        "_jwt_config": {
+            "custom_fields": [
+                {
+                    "name": "azienda_id",
+                    "type": "int",
+                    "default": ""
+                }
+            ]
         }
     }
 }

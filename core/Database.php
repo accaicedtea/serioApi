@@ -101,4 +101,29 @@ class Database {
         }
         return $existingTables;
     }
+
+    // Restituisce le colonne di una tabella con nome e tipo
+    public function getTableColumns($tableName) {
+        if (!in_array($tableName, $this->dbTables)) {
+            throw new \Exception("Tabella '$tableName' non trovata nel database.");
+        }
+        
+        $stmt = $this->pdo->prepare("DESCRIBE `$tableName`");
+        $stmt->execute();
+        $columns = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        
+        $result = [];
+        foreach ($columns as $col) {
+            $result[] = [
+                'name' => $col['Field'],
+                'type' => $col['Type'],
+                'null' => $col['Null'],
+                'key' => $col['Key'],
+                'default' => $col['Default'],
+                'extra' => $col['Extra']
+            ];
+        }
+        
+        return $result;
+    }
 }
